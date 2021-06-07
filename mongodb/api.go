@@ -45,13 +45,13 @@ func NewAuditAPI() AccountingAPI {
 	return new(AccountingAPIImpl)
 }
 
-type TxType int
+type TxType int8
 
 const (
-	TypeDeposit  TxType = 0
-	TypeMint     TxType = 1
-	TypeBurn     TxType = 2
-	TypeRedeemed TxType = 3
+	TypeDeposit  TxType = iota
+	TypeMint
+	TypeBurn
+	TypeRedeemed
 )
 
 func selectCollection(txtype TxType, tokenCfg *param.TokenConfig) (*mgo.Collection, error) {
