@@ -22,41 +22,46 @@ type SyncAPI interface {
 type BaseQueryAPI interface {
 	GetSyncInfo() (*SyncInfo, error)
 	GetDeposit(tokenCfg *param.TokenConfig, txhash string) (*SwapEvent, error)
-	GetDepositsByBlockRange(tokenCfg *param.TokenConfig, start, end int64) ([]*SwapEvent, error)
-	GetDepositsByTimeRange(tokenCfg *param.TokenConfig, start, end int64) ([]*SwapEvent, error)
-	GetDepositByUserTimeRange(tokenCfg *param.TokenConfig, user string, start, end int64) ([]*SwapEvent, error)
+	GetDepositsByBlockRange(tokenCfg *param.TokenConfig, start, end int64) (SwapEventIter, error)
+	GetDepositsByTimeRange(tokenCfg *param.TokenConfig, start, end int64) (SwapEventIter, error)
+	GetDepositByUserTimeRange(tokenCfg *param.TokenConfig, user string, start, end int64) (SwapEventIter, error)
 
 	GetMint(tokenCfg *param.TokenConfig, txhash string) (*SwapEvent, error)
-	GetMintByBlockRange(tokenCfg *param.TokenConfig, start, end int64) ([]*SwapEvent, error)
-	GetMintByTimeRange(tokenCfg *param.TokenConfig, start, end int64) ([]*SwapEvent, error)
-	GetMintByUserTimeRange(tokenCfg *param.TokenConfig, user string, start, end int64) ([]*SwapEvent, error)
+	GetMintByBlockRange(tokenCfg *param.TokenConfig, start, end int64) (SwapEventIter, error)
+	GetMintByTimeRange(tokenCfg *param.TokenConfig, start, end int64) (SwapEventIter, error)
+	GetMintByUserTimeRange(tokenCfg *param.TokenConfig, user string, start, end int64) (SwapEventIter, error)
 
 	GetBurn(tokenCfg *param.TokenConfig, txhash string) (*SwapEvent, error)
-	GetBurnByBlockRange(tokenCfg *param.TokenConfig, start, end int64) ([]*SwapEvent, error)
-	GetBurnByTimeRange(tokenCfg *param.TokenConfig, start, end int64) ([]*SwapEvent, error)
-	GetBurnByUserTimeRange(tokenCfg *param.TokenConfig, user string, start, end int64) ([]*SwapEvent, error)
+	GetBurnByBlockRange(tokenCfg *param.TokenConfig, start, end int64) (SwapEventIter, error)
+	GetBurnByTimeRange(tokenCfg *param.TokenConfig, start, end int64) (SwapEventIter, error)
+	GetBurnByUserTimeRange(tokenCfg *param.TokenConfig, user string, start, end int64) (SwapEventIter, error)
 
 	GetRedeemed(tokenCfg *param.TokenConfig, txhash string) (*SwapEvent, error)
-	GetRedeemedByBlockRange(tokenCfg *param.TokenConfig, start, end int64) ([]*SwapEvent, error)
-	GetRedeemedByTimeRange(tokenCfg *param.TokenConfig, start, end int64) ([]*SwapEvent, error)
-	GetRedeemedByUserTimeRange(tokenCfg *param.TokenConfig, user string, start, end int64) ([]*SwapEvent, error)
+	GetRedeemedByBlockRange(tokenCfg *param.TokenConfig, start, end int64) (SwapEventIter, error)
+	GetRedeemedByTimeRange(tokenCfg *param.TokenConfig, start, end int64) (SwapEventIter, error)
+	GetRedeemedByUserTimeRange(tokenCfg *param.TokenConfig, user string, start, end int64) (SwapEventIter, error)
 }
 
 type AuditAPI interface {
 	BaseQueryAPI
 	AuditQueryAPI
-	AddCheckRange(tokenCfg *param.TokenConfig) error
-	UpdateCheckRangeAccDeposit(tokenCfg *param.TokenConfig, value float64) error
-	UpdateCheckRangeAccMint(tokenCfg *param.TokenConfig, value float64) error
-	UpdateCheckRangeAccBurn(tokenCfg *param.TokenConfig, value float64) error
-	UpdateCheckRangeAccRedeemed(tokenCfg *param.TokenConfig, value float64) error
-	AddCheckRangeInfo() error
-	UpdateCheckInfo(int64) error
+	AddSummary(tokenCfg *param.TokenConfig, summary *Summary) error
+	UpdateSummary(tokenCfg *param.TokenConfig, accDeposit, accMint, accBurn, accRedeemed float64) error
+	AddSummaryInfo(*SummaryInfo) error
+	UpdateSummaryCollectionInfo(int64) error
 }
 
 type AuditQueryAPI interface {
-	GetSheetCollectionInfo() (*SheetCollectionInfo, error)
-	GetSheetInfo(sequence int64) (*SheetInfo, error)
-	GetSheet(tokenCfg *param.TokenConfig, sequence int64) (*Sheet, error)
-	GetSheetsBySequenceRange(tokenCfg *param.TokenConfig, start, end int64) ([]*Sheet, error)
+	GetSummaryCollectionInfo() (*SummaryCollectionInfo, error)
+	GetSummaryInfo(sequence int64) (*SummaryInfo, error)
+	GetSummary(tokenCfg *param.TokenConfig, sequence int64) (*Summary, error)
+	GetSummarysBySequenceRange(tokenCfg *param.TokenConfig, start, end int64) (SummaryIter, error)
+}
+
+type SwapEventIter interface {
+	Next(*SwapEvent) bool
+}
+
+type SummaryIter interface {
+	Next(*Summary) bool
 }

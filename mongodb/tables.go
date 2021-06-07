@@ -34,18 +34,21 @@ func tbBurn(tokenCfg *param.TokenConfig) string {
 	return "Burn_" + tokenCfg.PairID
 }
 
+var syncInfoID string = "sync_info_id"
+
 type SyncInfo struct {
-	SrcChainSyncedHeight int64 `bson:"src_synced_height"`
-	SrcChainStartHeight int64 `bson:"src_start_height"`
-	DstChainSyncedHeight int64 `bson:"dst_synced_height"`
-	DstChainStartHeight int64 `bson:"dst_start_height"`
+	ID                   string `bson:"_id"` // always syncInfoID
+	SrcChainSyncedHeight int64  `bson:"src_synced_height"`
+	SrcChainStartHeight  int64  `bson:"src_start_height"`
+	DstChainSyncedHeight int64  `bson:"dst_synced_height"`
+	DstChainStartHeight  int64  `bson:"dst_start_height"`
 }
 
 type SwapEvent struct {
-	TxHash string `bson:"_id"`
-	Timestamp int64 `bson:"timestamp"`
-	BlockNumber int64 `bson:"block_number"`
-	Amount string `bson:"amount"`
-	FAmount float64 `bson:"famount"`
-	User string `bson:"user"`
+	TxHash      string  `bson:"_id"`
+	BlockTime   int64   `bson:"block_time"`
+	BlockNumber int64   `bson:"block_number"`
+	Amount      string  `bson:"amount"`
+	FAmount     float64 `bson:"famount"`
+	User        string  `bson:"user"`
 }

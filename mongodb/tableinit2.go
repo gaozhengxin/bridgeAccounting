@@ -1,14 +1,14 @@
 package mongodb
 
 import (
-	"gopkg.in/mgo.v2"
 	"github.com/gaozhengxin/bridgeaudit/params"
+	"gopkg.in/mgo.v2"
 )
 
 var (
-	collSummaryInfo *mgo.Collection
+	collSummaryInfo           *mgo.Collection
 	collSummaryCollectionInfo *mgo.Collection
-	collSummarys = make(map[string]*mgo.Collection)
+	collSummarys              = make(map[string]*mgo.Collection)
 )
 
 func collSummary(tokenCfg *param.TokenConfig) *mgo.Collection {

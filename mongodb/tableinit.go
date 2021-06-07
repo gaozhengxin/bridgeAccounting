@@ -1,16 +1,16 @@
 package mongodb
 
 import (
-	"gopkg.in/mgo.v2"
 	"github.com/gaozhengxin/bridgeaudit/params"
+	"gopkg.in/mgo.v2"
 )
 
 var (
-	collSyncInfo *mgo.Collection
-	collDeposits = make(map[string]*mgo.Collection)
+	collSyncInfo  *mgo.Collection
+	collDeposits  = make(map[string]*mgo.Collection)
 	collRedeemeds = make(map[string]*mgo.Collection)
-	collMints = make(map[string]*mgo.Collection)
-	collBurns = make(map[string]*mgo.Collection)
+	collMints     = make(map[string]*mgo.Collection)
+	collBurns     = make(map[string]*mgo.Collection)
 )
 
 func collDeposit(tokenCfg *param.TokenConfig) *mgo.Collection {
