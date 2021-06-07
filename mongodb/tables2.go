@@ -1,19 +1,19 @@
 package mongodb
 
 import (
-	"github.com/jowenshaw/gethscan/params"
+	"github.com/gaozhengxin/bridgeaudit/params"
 )
 
 const (
-	tbSheetInfo string = "SheetInfo"
-	tbSheetCollectionInfo string = "SheetCollectionInfo"
+	tbSummaryInfo string = "SummaryInfo"
+	tbSummaryCollectionInfo string = "SummaryCollectionInfo"
 )
 
-func tbSheet(tokenCfg *param.TokenConfig) string {
+func tbSummary(tokenCfg *param.TokenConfig) string {
 	return "CheckRange_" + tokenCfg.PairID
 }
 
-type Sheet struct {
+type Summary struct {
 	Sequence int64 `bson:"_id"`
 	AccDeposit float64
 	AccMint float64
@@ -21,7 +21,7 @@ type Sheet struct {
 	AccRedeemed float64
 }
 
-type SheetInfo struct {
+type SummaryInfo struct {
 	Sequence int64 `bson:"_id"`
 	Tag string `bson:"tag"` // for example, date
 	SrcStartHeight int64 `bson:"src_start_height"`
@@ -30,6 +30,6 @@ type SheetInfo struct {
 	DstEndHeight int64 `bson:"dst_end_height"`
 }
 
-type SheetCollectionInfo struct {
+type SummaryCollectionInfo struct {
 	LatestSequence int64 `bson:"_id"`
 }

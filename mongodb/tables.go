@@ -1,7 +1,7 @@
 package mongodb
 
 import (
-	"github.com/jowenshaw/gethscan/params"
+	"github.com/gaozhengxin/bridgeaudit/params"
 )
 
 /*

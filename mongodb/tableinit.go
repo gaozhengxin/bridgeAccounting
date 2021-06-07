@@ -2,7 +2,7 @@ package mongodb
 
 import (
 	"gopkg.in/mgo.v2"
-	"github.com/jowenshaw/gethscan/params"
+	"github.com/gaozhengxin/bridgeaudit/params"
 )
 
 var (

@@ -1,12 +1,12 @@
 package mongodb
 
 import (
-	"github.com/jowenshaw/gethscan/params"
+	"github.com/gaozhengxin/bridgeaudit/params"
 )
 
 type QueryAPI interface {
 	BaseQueryAPI
-	AccountingQueryAPI
+	AuditQueryAPI
 }
 
 type SyncAPI interface {
@@ -42,9 +42,9 @@ type BaseQueryAPI interface {
 	GetRedeemedByUserTimeRange(tokenCfg *param.TokenConfig, user string, start, end int64) ([]*SwapEvent, error)
 }
 
-type AccountingAPI interface {
+type AuditAPI interface {
 	BaseQueryAPI
-	AccountingQueryAPI
+	AuditQueryAPI
 	AddCheckRange(tokenCfg *param.TokenConfig) error
 	UpdateCheckRangeAccDeposit(tokenCfg *param.TokenConfig, value float64) error
 	UpdateCheckRangeAccMint(tokenCfg *param.TokenConfig, value float64) error
@@ -54,7 +54,7 @@ type AccountingAPI interface {
 	UpdateCheckInfo(int64) error
 }
 
-type AccountingQueryAPI interface {
+type AuditQueryAPI interface {
 	GetSheetCollectionInfo() (*SheetCollectionInfo, error)
 	GetSheetInfo(sequence int64) (*SheetInfo, error)
 	GetSheet(tokenCfg *param.TokenConfig, sequence int64) (*Sheet, error)

@@ -1,7 +1,7 @@
 package mongodb
 
 import (
-	"github.com/jowenshaw/gethscan/params"
+	"github.com/gaozhengxin/bridgeaudit/params"
 )
 
 var (
@@ -16,7 +16,7 @@ func NewSyncAPI() SyncAPI {
 	return new(SyncAPIImpl)
 }
 
-func NewAccountingAPI() AccountingAPI {
+func NewAuditAPI() AccountingAPI {
 	return new(AccountingAPIImpl)
 }
 
@@ -38,13 +38,13 @@ type QueryAPIImpl MongoAPI {
 	*AccountingQueryAPI
 }
 
-type AccountingAPIImpl AccountingAPI {
-	*AccountingQueryAPI
+type AuditAPIImpl AccountingAPI {
+	*AuditQueryAPI
 }
 
 type BaseQueryAPIImpl struct {}
 
-type AccountingQueryAPI struct {}
+type AuditQueryAPI struct {}
 
 func (*BaseQueryAPIImpl) GetSyncInfo() (*SyncInfo, error) {
 	return nil. nil
@@ -158,46 +158,46 @@ func (*SyncAPIImpl) AddRedeemed(tokenCfg *param.TokenConfig, data SwapEvent) err
 	return addSwapEvent(TypeRedeemed, tokenCfg, data)
 }
 
-func (*AccountingQueryAPIImpl) GetSheetCollectionInfo() (*SheetCollectionInfo, error) {
+func (*AuditQueryAPIImpl) GetSheetCollectionInfo() (*SheetCollectionInfo, error) {
 	return nil, nil
 }
 
-func (*AccountingQueryAPIImpl) GetSheetInfo(sequence int64) (*SheetInfo, error) {
+func (*AuditQueryAPIImpl) GetSheetInfo(sequence int64) (*SheetInfo, error) {
 	return nil, nil
 }
 
-func (*AccountingQueryAPIImpl) GetSheet(tokenCfg *param.TokenConfig, sequence int64) (*Sheet, error) {
+func (*AuditQueryAPIImpl) GetSheet(tokenCfg *param.TokenConfig, sequence int64) (*Sheet, error) {
 	return nil, nil
 }
 
-func (*AccountingQueryAPIImpl) GetSheetsBySequenceRange(tokenCfg *param.TokenConfig, start, end int64) ([]*Sheet, error) {
+func (*AuditQueryAPIImpl) GetSheetsBySequenceRange(tokenCfg *param.TokenConfig, start, end int64) ([]*Sheet, error) {
 	return nil, nil
 }
 
-func (*AccountingAPIImpl) AddCheckRange(tokenCfg *param.TokenConfig) error {
+func (*AuditAPIImpl) AddCheckRange(tokenCfg *param.TokenConfig) error {
 	return nil
 }
 
-func (*AccountingAPIImpl) UpdateCheckRangeAccDeposit(tokenCfg *param.TokenConfig, value float64) error {
+func (*AuditAPIImpl) UpdateCheckRangeAccDeposit(tokenCfg *param.TokenConfig, value float64) error {
 	return nil
 }
 
-func (*AccountingAPIImpl) UpdateCheckRangeAccMint(tokenCfg *param.TokenConfig, value float64) error {
+func (*AuditAPIImpl) UpdateCheckRangeAccMint(tokenCfg *param.TokenConfig, value float64) error {
 	return nil
 }
 
-func (*AccountingAPIImpl) UpdateCheckRangeAccBurn(tokenCfg *param.TokenConfig, value float64) error {
+func (*AuditAPIImpl) UpdateCheckRangeAccBurn(tokenCfg *param.TokenConfig, value float64) error {
 	return nil
 }
 
-func (*AccountingAPIImpl) UpdateCheckRangeAccRedeemed(tokenCfg *param.TokenConfig, value float64) error {
+func (*AuditAPIImpl) UpdateCheckRangeAccRedeemed(tokenCfg *param.TokenConfig, value float64) error {
 	return nil
 }
 
-func (*AccountingAPIImpl) AddCheckRangeInfo() error {
+func (*AuditAPIImpl) AddCheckRangeInfo() error {
 	return nil
 }
 
-func (*AccountingAPIImpl) UpdateCheckInfo(int64) error {
+func (*AuditAPIImpl) UpdateCheckInfo(int64) error {
 	return nil
 }

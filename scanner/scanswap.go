@@ -18,8 +18,8 @@ import (
 	"github.com/fsn-dev/fsn-go-sdk/efsn/common"
 	"github.com/fsn-dev/fsn-go-sdk/efsn/core/types"
 	"github.com/fsn-dev/fsn-go-sdk/efsn/ethclient"
-	"github.com/jowenshaw/gethscan/params"
-	"github.com/jowenshaw/gethscan/tools"
+	"github.com/gaozhengxin/bridgeaudit/params"
+	"github.com/gaozhengxin/bridgeaudit/tools"
 	"github.com/urfave/cli/v2"
 )
 
@@ -99,6 +99,10 @@ type ethSwapScanner struct {
 	cachedSwapPosts *tools.Ring
 }
 
+var (
+	dbAPI mongodb.SyncAPI
+)
+
 type swapPost struct {
 	txid       string
 	pairID     string
@@ -149,6 +153,7 @@ func (scanner *ethSwapScanner) initClient() {
 }
 
 func (scanner *ethSwapScanner) run() {
+	dbAPI
 	scanner.cachedSwapPosts = tools.NewRing(100)
 	go scanner.repostCachedSwaps()
 

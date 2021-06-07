@@ -1,4 +1,4 @@
-module github.com/jowenshaw/gethscan
+module github.com/gaozhengxin/bridgeaudit
 
 go 1.15
 
