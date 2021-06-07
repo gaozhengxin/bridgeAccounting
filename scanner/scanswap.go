@@ -12,9 +12,7 @@ import (
 
 	"github.com/anyswap/CrossChain-Bridge/cmd/utils"
 	"github.com/anyswap/CrossChain-Bridge/log"
-	"github.com/anyswap/CrossChain-Bridge/rpc/client"
 	"github.com/anyswap/CrossChain-Bridge/tokens"
-	ctools "github.com/anyswap/CrossChain-Bridge/tokens/tools"
 	"github.com/fsn-dev/fsn-go-sdk/efsn/common"
 	"github.com/fsn-dev/fsn-go-sdk/efsn/core/types"
 	"github.com/fsn-dev/fsn-go-sdk/efsn/ethclient"
@@ -95,20 +93,22 @@ type ethSwapScanner struct {
 
 	rpcInterval   time.Duration
 	rpcRetryCount int
-
-	cachedSwapPosts *tools.Ring
 }
 
 var (
 	dbAPI mongodb.SyncAPI
-)
-
-type swapPost struct {
-	txid       string
-	pairID     string
-	rpcMethod  string
-	swapServer string
+/*
+type SyncAPI interface {
+	BaseQueryAPI
+	SetStartHeight(srcStartHeight, dstStartHeight int64) error
+	UpdateSyncedHeight(srcSyncedHeight, dstSyncedHeight int64) error
+	AddDeposit(tokenCfg *param.TokenConfig, data SwapEvent) error
+	AddMint(tokenCfg *param.TokenConfig, data SwapEvent) error
+	AddBurn(tokenCfg *param.TokenConfig, data SwapEvent) error
+	AddRedeemed(tokenCfg *param.TokenConfig, data SwapEvent) error
 }
+*/
+)
 
 func scanSwap(ctx *cli.Context) error {
 	utils.SetLogger(ctx)
@@ -153,10 +153,6 @@ func (scanner *ethSwapScanner) initClient() {
 }
 
 func (scanner *ethSwapScanner) run() {
-	dbAPI
-	scanner.cachedSwapPosts = tools.NewRing(100)
-	go scanner.repostCachedSwaps()
-
 	scanner.processBlockTimers = make([]*time.Timer, scanner.jobCount+1)
 	for i := 0; i < len(scanner.processBlockTimers); i++ {
 		scanner.processBlockTimers[i] = time.NewTimer(scanner.processBlockTimeout)
@@ -316,22 +312,65 @@ func (scanner *ethSwapScanner) scanTransaction(tx *types.Transaction) {
 	}
 
 	for _, tokenCfg := range params.GetScanConfig().Tokens {
-		matched, verifyErr := scanner.verifyTransaction(tx, receipt, tokenCfg)
+		swapTxType, swapEvent, verifyErr := scanner.verifyTransaction(tx, receipt, tokenCfg)
 		if verifyErr != nil {
 			log.Debug("verify tx failed", "txHash", txHash, "err", verifyErr)
 		}
-		if matched {
-			if tokens.ShouldRegisterSwapForError(verifyErr) {
-				scanner.postSwap(txHash, tokenCfg)
-			} else {
+
+		var syncError error
+		switch swapTxType {
+		case TypeDeposit:
+			syncError = dbAPI.AddDeposit(tokenCfg, swapEvent)
+		case TypeMint:
+			syncError = dbAPI.AddMint(tokenCfg, swapEvent)
+		case TypeBurn:
+			syncError = dbAPI.AddBurn(tokenCfg, swapEvent)
+		case TypeRedeemed:
+			syncError = dbAPI.AddRedeemed(tokenCfg, swapEvent)
+		default:
+			if verifyErr != nil {
 				scanner.printVerifyError(txHash, verifyErr)
 			}
-			break
+		}
+		if syncError != nil {
+			log.Warn("Add swap event error", "swapTxType", swapTxType, "syncError", syncError)
 		}
 	}
 }
 
-func (scanner *ethSwapScanner) verifyTransaction(tx *types.Transaction, receipt *types.Receipt, tokenCfg *params.TokenConfig) (matched bool, verifyErr error) {
+type SwapTxType int8
+
+const (
+	TypeDeposit  SwapTxType = iota
+	TypeMint
+	TypeBurn
+	TypeRedeemed
+)
+
+const TypeNull SwapTxType = -1
+
+type SwapEvent struct {
+	TxHash common.Hash
+	BlockTime int64
+	BlockNumber *big.Int
+	Amount *big.Int
+	User common.Address
+}
+
+func tonvertToMgoSwapEvent(swapEvent *SwapEvent, decimal int) *mongodb.SwapEvent {
+	return &mongodb.SwapEvent{
+		TxHash: strings.ToLower(swapEvent.TxHash.String()),
+		BlockTime: swapEvent.BlockTime,
+		BlockNumber: swapEvent.BlockNumber.Int64(),
+		Amount: swapEvent.Amount.String(),
+		FAmount: toFloat(swapEvent.Amount, decimal),
+		User: strings.ToLower(swapEvent.User.String()),
+	}
+}
+
+func toFloat(bigint *big.Int, decimal int) float64 {}
+
+func (scanner *ethSwapScanner) verifyTransaction(tx *types.Transaction, receipt *types.Receipt, tokenCfg *params.TokenConfig) (txType SwapTxType, swapData *SwapEvent, verifyErr error) {
 	txTo := tx.To().Hex()
 	cmpTxTo := tokenCfg.TokenAddress
 	depositAddress := tokenCfg.DepositAddress
@@ -343,7 +382,7 @@ func (scanner *ethSwapScanner) verifyTransaction(tx *types.Transaction, receipt 
 			r, err := scanner.loopGetTxReceipt(txHash)
 			if err != nil {
 				log.Warn("get tx receipt error", "txHash", txHash.Hex(), "err", err)
-				return false, nil
+				return TypeNull, nil, nil
 			}
 			receipt = r
 		}
@@ -352,28 +391,37 @@ func (scanner *ethSwapScanner) verifyTransaction(tx *types.Transaction, receipt 
 	switch {
 	case depositAddress != "":
 		if tokenCfg.IsNativeToken() {
-			matched = strings.EqualFold(txTo, depositAddress)
-			return matched, nil
+			matched := strings.EqualFold(txTo, depositAddress)
+			if matched {
+				swapData = &SwapEvent{
+					TxHash
+					BlockTime
+					Amount
+					User
+				}
+				return TypeDeposit, nil, nil
+			}
+			return TypeNull, nil, nil
 		} else if strings.EqualFold(txTo, cmpTxTo) {
 			verifyErr = scanner.verifyErc20SwapinTx(tx, receipt, tokenCfg)
 			if verifyErr == tokens.ErrTxWithWrongReceiver {
 				// swapin my have multiple deposit addresses for different bridges
-				return false, verifyErr
+				return TypeNull, nil, verifyErr
 			}
-			return true, verifyErr
+			return TypeDeposit, nil, verifyErr
 		}
 	case !scanner.scanReceipt:
 		if strings.EqualFold(txTo, cmpTxTo) {
 			verifyErr = scanner.verifySwapoutTx(tx, receipt, tokenCfg)
-			return true, verifyErr
+			return TypeBurn, nil, verifyErr
 		}
 	default:
 		verifyErr = scanner.parseSwapoutTxLogs(receipt.Logs, tokenCfg)
 		if verifyErr == nil {
-			return true, nil
+			return TypeBurn, nil, nil
 		}
 	}
-	return false, verifyErr
+	return TypeNull, nil, verifyErr
 }
 
 func (scanner *ethSwapScanner) printVerifyError(txHash string, verifyErr error) {
@@ -385,97 +433,6 @@ func (scanner *ethSwapScanner) printVerifyError(txHash string, verifyErr error) 
 	default:
 		log.Debug("verify swap error", "txHash", txHash, "err", verifyErr)
 	}
-}
-
-func (scanner *ethSwapScanner) postSwap(txid string, tokenCfg *params.TokenConfig) {
-	pairID := tokenCfg.PairID
-	var subject, rpcMethod string
-	if tokenCfg.DepositAddress != "" {
-		subject = "post swapin register"
-		rpcMethod = "swap.Swapin"
-	} else {
-		subject = "post swapout register"
-		rpcMethod = "swap.Swapout"
-	}
-	log.Info(subject, "txid", txid, "pairID", pairID)
-
-	swap := &swapPost{
-		txid:       txid,
-		pairID:     pairID,
-		rpcMethod:  rpcMethod,
-		swapServer: tokenCfg.SwapServer,
-	}
-
-	var needCached bool
-	for i := 0; i < scanner.rpcRetryCount; i++ {
-		err := rpcPost(swap)
-		if tokens.ShouldRegisterSwapForError(err) {
-			needCached = false
-			break
-		}
-		if ctools.IsSwapAlreadyExistRegisterError(err) ||
-			strings.Contains(err.Error(), swapExistKeywords) {
-			needCached = false
-			break
-		}
-		switch {
-		case errors.Is(err, tokens.ErrTxFuncHashMismatch):
-			break
-		case errors.Is(err, tokens.ErrTxNotFound) ||
-			strings.Contains(err.Error(), httpTimeoutKeywords):
-			needCached = true
-		default:
-			log.Warn(subject+" failed", "swap", swap, "err", err)
-		}
-		time.Sleep(scanner.rpcInterval)
-	}
-	if needCached {
-		log.Warn("cache swap", "swap", swap)
-		scanner.cachedSwapPosts.Add(swap)
-	}
-}
-
-func (scanner *ethSwapScanner) repostCachedSwaps() {
-	for {
-		scanner.cachedSwapPosts.Do(func(p interface{}) bool {
-			return scanner.repostSwap(p.(*swapPost))
-		})
-		time.Sleep(10 * time.Second)
-	}
-}
-
-func rpcPost(swap *swapPost) error {
-	timeout := 300
-	reqID := 666
-	args := map[string]interface{}{
-		"txid":   swap.txid,
-		"pairid": swap.pairID,
-	}
-	var result interface{}
-	return client.RPCPostWithTimeoutAndID(&result, timeout, reqID, swap.swapServer, swap.rpcMethod, args)
-}
-
-func (scanner *ethSwapScanner) repostSwap(swap *swapPost) bool {
-	for i := 0; i < scanner.rpcRetryCount; i++ {
-		err := rpcPost(swap)
-		if tokens.ShouldRegisterSwapForError(err) {
-			return true
-		}
-		if ctools.IsSwapAlreadyExistRegisterError(err) ||
-			strings.Contains(err.Error(), swapExistKeywords) {
-			return true
-		}
-		switch {
-		case errors.Is(err, tokens.ErrTxNotFound):
-		case errors.Is(err, tokens.ErrRPCQueryError):
-		case strings.Contains(err.Error(), httpTimeoutKeywords):
-		default:
-			log.Warn("repost swap failed", "swap", swap, "err", err)
-			return true
-		}
-		time.Sleep(scanner.rpcInterval)
-	}
-	return false
 }
 
 func (scanner *ethSwapScanner) getSwapoutFuncHashByTxType(txType string) []byte {
