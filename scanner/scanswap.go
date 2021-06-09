@@ -62,7 +62,7 @@ scan cross chain swaps
 		},
 	}
 
-	// 0. Deposit
+	// 0. Deposit and 3. Redeemed
 	transferFuncHash       = common.FromHex("0xa9059cbb")
 	transferFromFuncHash   = common.FromHex("0x23b872dd")
 
@@ -73,15 +73,13 @@ scan cross chain swaps
 	addressSwapoutFuncHash = common.FromHex("0x628d6cba") // for ETH like `address` type address
 	stringSwapoutFuncHash  = common.FromHex("0xad54056d") // for BTC like `string` type address
 
-	// 3. Redeemed
-
-	// 0. Deposit log, but also seen in Mint
+	// 0. Deposit and 3. Redeemed log, but also seen in 1. Mint
 	transferLogTopic       = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
 
 	// 1. Mint log
 	swapInLogTopic = common.HexToHash("0x05d0634fe981be85c22e2942a880821b70095d84e152c3ea3c17a4e4250d9d61")
 
-	// 2. Burn Log
+	// 2. Burn log
 	addressSwapoutLogTopic = common.HexToHash("0x6b616089d04950dc06c45c6dd787d657980543f89651aec47924752c7d16c888")
 	stringSwapoutLogTopic  = common.HexToHash("0x9c92ad817e5474d30a4378deface765150479363a897b0590fbb12ae9d89396b")
 )
@@ -396,6 +394,8 @@ func (scanner *ethSwapScanner) verifyTransaction(tx *types.Transaction, receipt 
 	switch {
 	case depositAddress != "":
 		if tokenCfg.IsNativeToken() {
+			// Src chain, Deposit or Redeemed
+			// TODO
 			matched := strings.EqualFold(txTo, depositAddress)
 			if matched {
 				swapData = &SwapEvent{
@@ -416,23 +416,29 @@ func (scanner *ethSwapScanner) verifyTransaction(tx *types.Transaction, receipt 
 			}
 			return TypeDeposit, swapData, verifyErr
 		}
-	case !scanner.scanReceipt:
-		if strings.EqualFold(txTo, cmpTxTo) {
-			swapData, verifyErr = scanner.verifySwapoutTx(tx, receipt, tokenCfg)
-			return TypeBurn, swapData, verifyErr
+	case redeemAddress != "":
+		// Dst chain, Mint or Burn
+		// TODO
+		switch {
+		case !scanner.scanReceipt:
+			if strings.EqualFold(txTo, cmpTxTo) {
+				swapData, verifyErr = scanner.verifySwapoutTx(tx, receipt, tokenCfg)
+				return TypeBurn, swapData, verifyErr
+			}
+		default:
+			swapData = &SwapEvent{
+				TxHash: strings.ToLower(tx.Hash().String()),
+				BlockTime: getBlockTimestamp(receipt.BlockNumber.ToInt()),
+				BlockNumber: receipt.BlockNumber,
+				Amount: nil,
+				User: common.Address{},
+			}
+			verifyErr = scanner.parseSwapoutTxLogs(receipt.Logs, tokenCfg, swapData)
+			if verifyErr == nil {
+				return TypeBurn, swapData, nil
+			}
 		}
 	default:
-		swapData = &SwapEvent{
-			TxHash: strings.ToLower(tx.Hash().String()),
-			BlockTime: getBlockTimestamp(receipt.BlockNumber.ToInt()),
-			BlockNumber: receipt.BlockNumber,
-			Amount: nil,
-			User: common.Address{},
-		}
-		verifyErr = scanner.parseSwapoutTxLogs(receipt.Logs, tokenCfg, swapData)
-		if verifyErr == nil {
-			return TypeBurn, swapData, nil
-		}
 	}
 	return TypeNull, nil, verifyErr
 }
