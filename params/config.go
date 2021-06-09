@@ -36,6 +36,7 @@ type TokenConfig struct {
 	CallByContract string `toml:",omitempty" json:",omitempty"`
 	TokenAddress   string
 	DepositAddress string `toml:",omitempty" json:",omitempty"`
+	Decimal int `toml:",omitempty" json:",omitempty"`
 }
 
 // IsNativeToken is native token
