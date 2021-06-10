@@ -6,7 +6,7 @@ import (
 
 type QueryAPI interface {
 	BaseQueryAPI
-	AuditQueryAPI
+	AccountingQueryAPI
 }
 
 type SyncAPI interface {
@@ -42,16 +42,16 @@ type BaseQueryAPI interface {
 	GetRedeemedByUserTimeRange(tokenCfg *param.TokenConfig, user string, start, end int64) (SwapEventIter, error)
 }
 
-type AuditAPI interface {
+type AccountingAPI interface {
 	BaseQueryAPI
-	AuditQueryAPI
+	AccountingQueryAPI
 	AddSummary(tokenCfg *param.TokenConfig, summary *Summary) error
 	UpdateSummary(tokenCfg *param.TokenConfig, accDeposit, accMint, accBurn, accRedeemed float64) error
 	AddSummaryInfo(*SummaryInfo) error
 	UpdateSummaryCollectionInfo(int64) error
 }
 
-type AuditQueryAPI interface {
+type AccountingQueryAPI interface {
 	GetSummaryCollectionInfo() (*SummaryCollectionInfo, error)
 	GetSummaryInfo(sequence int64) (*SummaryInfo, error)
 	GetSummary(tokenCfg *param.TokenConfig, sequence int64) (*Summary, error)

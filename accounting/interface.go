@@ -1,17 +1,17 @@
-package audit
+package accounting
 
 import (
 	"github.com/gaozhengxin/bridgeaudit/params"
 	"github.com/gaozhengxin/bridgeaudit/mongodb"
 )
 
-type AuditAPI interface {
-	AuditQueryAPI
+type AccountingAPI interface {
+	AccountingQueryAPI
 	MakeSummaryInfo(tag string, srcStartHeight, srcEndHeight, dstStartHeight, dstEndHeight int64) (*mongodb.SummaryInfo, error)
 	MakeSummary(*params.TokenConfig) (*mongodb.SummaryInfo, error)
 }
 
-type AuditQueryAPI interface {
+type AccountingQueryAPI interface {
 	GetSummaryInfo()
 	GetSummaryInfoByTag()
 	GetSummary(*params.TokenConfig)

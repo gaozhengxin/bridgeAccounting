@@ -26,6 +26,13 @@ var (
 // ScanConfig scan config
 type ScanConfig struct {
 	Tokens []*TokenConfig
+	Gateway string
+	ScanReceipt bool
+	StartHeightArgument int64
+	EndHeight int64
+	StableHeight int64
+	JobCount int
+	ProcessBlockTimeout int64
 }
 
 // TokenConfig token config

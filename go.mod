@@ -1,4 +1,4 @@
-module github.com/gaozhengxin/bridgeaudit
+module github.com/gaozhengxin/bridgeAccounting
 
 go 1.15
 

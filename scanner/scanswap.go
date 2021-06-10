@@ -17,9 +17,10 @@ import (
 	"github.com/fsn-dev/fsn-go-sdk/efsn/core/types"
 	"github.com/fsn-dev/fsn-go-sdk/efsn/ethclient"
 	ethereum "github.com/fsn-dev/fsn-go-sdk/efsn"
-	"github.com/gaozhengxin/bridgeaudit/params"
-	"github.com/gaozhengxin/bridgeaudit/mongodb"
-	"github.com/gaozhengxin/bridgeaudit/tools"
+	"github.com/gaozhengxin/bridgeAccounting/params"
+	"github.com/gaozhengxin/bridgeAccounting/mongodb"
+	"github.com/gaozhengxin/bridgeAccounting/tools"
+	"github.com/gaozhengxin/bridgeAccounting/accounting"
 	"github.com/urfave/cli/v2"
 )
 
@@ -41,10 +42,10 @@ var (
 		Value: 300,
 	}
 
-	// ScanSwapCommand scan swaps on eth like blockchain
-	ScanSwapCommand = &cli.Command{
-		Action:    scanSwap,
-		Name:      "scanswap",
+	// StartCommand scan swaps on eth like blockchain, and do accounting
+	StartCommand = &cli.Command{
+		Action:    start,
+		Name:      "start",
 		Usage:     "scan cross chain swaps",
 		ArgsUsage: " ",
 		Description: `
@@ -52,13 +53,6 @@ scan cross chain swaps
 `,
 		Flags: []cli.Flag{
 			utils.ConfigFileFlag,
-			utils.GatewayFlag,
-			scanReceiptFlag,
-			startHeightFlag,
-			utils.EndHeightFlag,
-			utils.StableHeightFlag,
-			utils.JobsFlag,
-			timeoutFlag,
 		},
 	}
 
@@ -89,11 +83,11 @@ const (
 	httpTimeoutKeywords = "Client.Timeout exceeded while awaiting headers"
 )
 
-var startHeightArgument int64
-
 type ethSwapScanner struct {
 	gateway     string
 	scanReceipt bool
+
+	startHeightArgument int64
 
 	endHeight    uint64
 	stableHeight uint64
@@ -124,23 +118,24 @@ type SyncAPI interface {
 */
 )
 
-func scanSwap(ctx *cli.Context) error {
+func start(ctx *cli.Context) error {
 	utils.SetLogger(ctx)
-	params.LoadConfig(utils.GetConfigFilePath(ctx))
+	cfg := params.LoadConfig(utils.GetConfigFilePath(ctx))
 	go params.WatchAndReloadScanConfig()
 
-	scanner := &ethSwapScanner{
+	srcScanner := &ethSwapScanner{
 		ctx:           context.Background(),
 		rpcInterval:   1 * time.Second,
 		rpcRetryCount: 3,
 	}
-	scanner.gateway = ctx.String(utils.GatewayFlag.Name)
-	scanner.scanReceipt = ctx.Bool(scanReceiptFlag.Name)
-	startHeightArgument = ctx.Int64(startHeightFlag.Name)
-	scanner.endHeight = ctx.Uint64(utils.EndHeightFlag.Name)
-	scanner.stableHeight = ctx.Uint64(utils.StableHeightFlag.Name)
-	scanner.jobCount = ctx.Uint64(utils.JobsFlag.Name)
-	scanner.processBlockTimeout = time.Duration(ctx.Uint64(timeoutFlag.Name)) * time.Second
+	srcScanner.gateway = ctg.Gateway
+	srcScanner.scanReceipt = cfg.ScanReceipt
+	srcScanner.StartHeightArgument = cfg.StartHeightArgument
+	// TODO
+	srcScanner.endHeight = ctx.Uint64(utils.EndHeightFlag.Name)
+	srcScanner.stableHeight = ctx.Uint64(utils.StableHeightFlag.Name)
+	srcScanner.jobCount = ctx.Uint64(utils.JobsFlag.Name)
+	srcScanner.processBlockTimeout = time.Duration(ctx.Uint64(timeoutFlag.Name)) * time.Second
 
 	log.Info("get argument success",
 		"gateway", scanner.gateway,
@@ -153,7 +148,11 @@ func scanSwap(ctx *cli.Context) error {
 	)
 
 	scanner.initClient()
-	scanner.run()
+	select {
+		go srcScanner.run()
+		go dstScanner.run()
+		go accounting()
+	}
 	return nil
 }
 
@@ -176,12 +175,12 @@ func (scanner *ethSwapScanner) run() {
 	if wend == 0 {
 		wend = scanner.loopGetLatestBlockNumber()
 	}
-	if startHeightArgument != 0 {
+	if scanner.startHeightArgument != 0 {
 		var start uint64
-		if startHeightArgument > 0 {
-			start = uint64(startHeightArgument)
-		} else if startHeightArgument < 0 {
-			start = wend - uint64(-startHeightArgument)
+		if scanner.startHeightArgument > 0 {
+			start = uint64(scanner.startHeightArgument)
+		} else if scanner.startHeightArgument < 0 {
+			start = wend - uint64(-scanner.startHeightArgument)
 		}
 		scanner.doScanRangeJob(start, wend)
 	}

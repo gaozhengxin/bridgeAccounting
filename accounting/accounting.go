@@ -1,4 +1,4 @@
-package audit
+package accounting
 
 import (
 	"github.com/gaozhengxin/bridgeaudit/mongodb"
@@ -8,6 +8,6 @@ var (
 	dbAPI mongodb.AccountingAPI
 )
 
-func StartAudit() {
+func StartAccounting() {
 	dbAPI = mongodb.NewAccountingAPI()
 }

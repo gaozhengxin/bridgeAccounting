@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gaozhengxin/bridgeaudit/params"
+	"github.com/gaozhengxin/bridgeAccounting/params"
 	"github.com/pkg/errors"
 
 	"github.com/davecgh/go-spew/spew"
@@ -41,7 +41,7 @@ func NewSyncAPI() SyncAPI {
 	return new(SyncAPIImpl)
 }
 
-func NewAuditAPI() AccountingAPI {
+func NewAccountingAPI() AccountingAPI {
 	return new(AccountingAPIImpl)
 }
 
@@ -83,13 +83,13 @@ type QueryAPIImpl struct {
 	*AccountingQueryAPI
 }
 
-type AuditAPIImpl struct {
-	*AuditQueryAPI
+type AccountingAPIImpl struct {
+	*AccountingQueryAPI
 }
 
 type BaseQueryAPIImpl struct{}
 
-type AuditQueryAPI struct{}
+type AccountingQueryAPI struct{}
 
 func (*BaseQueryAPIImpl) GetSyncInfo() (*SyncInfo, error) {
 	result := new(SyncInfo)
@@ -303,7 +303,7 @@ func (*SyncAPIImpl) AddRedeemed(tokenCfg *param.TokenConfig, data SwapEvent) err
 	return addSwapEvent(TypeRedeemed, tokenCfg, data)
 }
 
-func (*AuditQueryAPIImpl) GetSummaryCollectionInfo() (*SummaryCollectionInfo, error) {
+func (*AccountingQueryAPIImpl) GetSummaryCollectionInfo() (*SummaryCollectionInfo, error) {
 	result := new(SummaryCollectionInfo)
 	err := collSummaryCollectionInfo.FindId(bson.M{"_id": summaryCollectionInfoID}).One(result)
 	if err != nil {
@@ -312,7 +312,7 @@ func (*AuditQueryAPIImpl) GetSummaryCollectionInfo() (*SummaryCollectionInfo, er
 	return result, nil
 }
 
-func (*AuditQueryAPIImpl) GetSummaryInfo(sequence int64) (*SummaryInfo, error) {
+func (*AccountingQueryAPIImpl) GetSummaryInfo(sequence int64) (*SummaryInfo, error) {
 	result := new(SummaryInfo)
 	err := collSummaryInfo.FindId(bson.M{"_id": sequence}).One(result)
 	if err != nil {
@@ -321,7 +321,7 @@ func (*AuditQueryAPIImpl) GetSummaryInfo(sequence int64) (*SummaryInfo, error) {
 	return result, nil
 }
 
-func (*AuditQueryAPIImpl) GetSummary(tokenCfg *param.TokenConfig, sequence int64) (*Summary, error) {
+func (*AccountingQueryAPIImpl) GetSummary(tokenCfg *param.TokenConfig, sequence int64) (*Summary, error) {
 	coll := collSummarys(tokenCfg)
 	if coll == nil {
 		return nil, wrapError(fmt.Errorf("collection not initiated, pairID: %v", tokenCfg.PairID), "GetSummary")
@@ -334,7 +334,7 @@ func (*AuditQueryAPIImpl) GetSummary(tokenCfg *param.TokenConfig, sequence int64
 	return result, nil
 }
 
-func (*AuditQueryAPIImpl) GetSummarysBySequenceRange(tokenCfg *param.TokenConfig, start, end int64) (*SummaryIter, error) {
+func (*AccountingQueryAPIImpl) GetSummarysBySequenceRange(tokenCfg *param.TokenConfig, start, end int64) (*SummaryIter, error) {
 	coll := collSummarys(tokenCfg)
 	if coll == nil {
 		return nil, wrapError(fmt.Errorf("collection not initiated, pairID: %v", tokenCfg.PairID), "GetSummarysBySequenceRange")
@@ -346,7 +346,7 @@ func (*AuditQueryAPIImpl) GetSummarysBySequenceRange(tokenCfg *param.TokenConfig
 	return summaryIter, nil
 }
 
-func (*AuditAPIImpl) AddSummary(tokenCfg *param.TokenConfig, summary *Summary) error {
+func (*AccountingAPIImpl) AddSummary(tokenCfg *param.TokenConfig, summary *Summary) error {
 	coll := collSummarys(tokenCfg)
 	if coll == nil {
 		return nil, wrapError(fmt.Errorf("collection not initiated, pairID: %v", tokenCfg.PairID), GetSummary)
@@ -354,7 +354,7 @@ func (*AuditAPIImpl) AddSummary(tokenCfg *param.TokenConfig, summary *Summary) e
 	return nil
 }
 
-func (*AuditAPIImpl) UpdateSummary(
+func (*AccountingAPIImpl) UpdateSummary(
 	tokenCfg *param.TokenConfig,
 	accDeposit,
 	accMint,
@@ -367,7 +367,7 @@ func (*AuditAPIImpl) UpdateSummary(
 	return nil
 }
 
-func (*AuditAPIImpl) AddSummaryInfo(data *SummaryInfo) error {
+func (*AccountingAPIImpl) AddSummaryInfo(data *SummaryInfo) error {
 	err := collSummaryInfo.Insert(data)
 	if err != nil {
 		return wrapError(err, "AddSummaryInfo")
@@ -375,7 +375,7 @@ func (*AuditAPIImpl) AddSummaryInfo(data *SummaryInfo) error {
 	return nil
 }
 
-func (*AuditAPIImpl) UpdateSummaryCollectionInfo(latestSequence int64) error {
+func (*AccountingAPIImpl) UpdateSummaryCollectionInfo(latestSequence int64) error {
 	info, err := collSummaryCollectionInfo.UpsertID(
 		bson.M{"_id": summaryCollectionInfoID},
 		bson.M{"$set": latestSequence},
