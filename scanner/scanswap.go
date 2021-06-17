@@ -128,23 +128,45 @@ func start(ctx *cli.Context) error {
 		rpcInterval:   1 * time.Second,
 		rpcRetryCount: 3,
 	}
-	srcScanner.gateway = ctg.Gateway
-	srcScanner.scanReceipt = cfg.ScanReceipt
-	srcScanner.StartHeightArgument = cfg.StartHeightArgument
-	// TODO
-	srcScanner.endHeight = ctx.Uint64(utils.EndHeightFlag.Name)
-	srcScanner.stableHeight = ctx.Uint64(utils.StableHeightFlag.Name)
-	srcScanner.jobCount = ctx.Uint64(utils.JobsFlag.Name)
-	srcScanner.processBlockTimeout = time.Duration(ctx.Uint64(timeoutFlag.Name)) * time.Second
+	srcScanner.gateway = ctg.SrcGateway
+	srcScanner.scanReceipt = cfg.SrcScanReceipt
+	srcScanner.startHeightArgument = cfg.SrcStartHeightArgument
+	srcScanner.endHeight = uint64(cfg.SrcEndHeight)
+	srcScanner.stableHeight = uint64(cfg.SrcStableHeight)
+	srcScanner.jobCount = uint64(cfg.SrcJobCount)
+	srcScanner.processBlockTimeout = uint64(cfg.SrcProcessBlockTimeout)
 
-	log.Info("get argument success",
-		"gateway", scanner.gateway,
-		"scanReceipt", scanner.scanReceipt,
-		"start", startHeightArgument,
-		"end", scanner.endHeight,
-		"stable", scanner.stableHeight,
-		"jobs", scanner.jobCount,
-		"timeout", scanner.processBlockTimeout,
+	log.Info("get src argument success",
+		"gateway", srcScanner.gateway,
+		"scanReceipt", srcScanner.scanReceipt,
+		"start", srcScanner.startHeightArgument,
+		"end", srcScanner.endHeight,
+		"stable", srcScanner.stableHeight,
+		"jobs", srcScanner.jobCount,
+		"timeout", srcScanner.processBlockTimeout,
+	)
+
+	dstScanner := &ethSwapScanner{
+		ctx:           context.Background(),
+		rpcInterval:   1 * time.Second,
+		rpcRetryCount: 3,
+	}
+	dstScanner.gateway = ctg.DstGateway
+	dstScanner.scanReceipt = cfg.DstScanReceipt
+	dstScanner.startHeightArgument = cfg.DstStartHeightArgument
+	dstScanner.endHeight = uint64(cfg.DstEndHeight)
+	dstScanner.stableHeight = uint64(cfg.DstStableHeight)
+	dstScanner.jobCount = uint64(cfg.DstJobCount)
+	dstScanner.processBlockTimeout = uint64(cfg.DstProcessBlockTimeout)
+
+	log.Info("get dst argument success",
+		"gateway", dstScanner.gateway,
+		"scanReceipt", dstScanner.scanReceipt,
+		"start", dstScanner.startHeightArgument,
+		"end", dstScanner.endHeight,
+		"stable", dstScanner.stableHeight,
+		"jobs", dstScanner.jobCount,
+		"timeout", dstScanner.processBlockTimeout,
 	)
 
 	scanner.initClient()
