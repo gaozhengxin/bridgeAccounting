@@ -1,8 +1,9 @@
 package mongodb
 
 import (
-	"github.com/gaozhengxin/bridgeaudit/params"
 	"gopkg.in/mgo.v2"
+
+	"github.com/gaozhengxin/bridgeAccounting/params"
 )
 
 var (
@@ -11,20 +12,20 @@ var (
 	collSummarys              = make(map[string]*mgo.Collection)
 )
 
-func collSummary(tokenCfg *param.TokenConfig) *mgo.Collection {
+func collSummary(tokenCfg *params.TokenConfig) *mgo.Collection {
 	return collSummarys[tokenCfg.PairID]
 }
 
 // do this when reconnect to the database
-func deinintCollections2() {
+func deinintCollections2(scanConfig *params.ScanConfig) {
 	collSummaryInfo = database.C(tbSummaryInfo)
 	collSummaryCollectionInfo = database.C(tbSummaryCollectionInfo)
 	for _, tk := range scanConfig.Tokens {
-		collSummary(tk) = database.C(tbSummary(tk))
+		collSummarys[tk.PairID] = database.C(tbSummary(tk))
 	}
 }
 
-func initCollections2(scanConfig *ScanConfig) {
+func initCollections2(scanConfig *params.ScanConfig) {
 	initCollection(tbSummaryInfo, collSummaryInfo)
 	initCollection(tbSummaryCollectionInfo, collSummaryCollectionInfo)
 	for _, tk := range scanConfig.Tokens {

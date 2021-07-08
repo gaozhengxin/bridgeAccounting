@@ -5,7 +5,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/gaozhengxin/bridgeaudit/params"
+	"github.com/gaozhengxin/bridgeAccounting/params"
 	"github.com/urfave/cli/v2"
 )
 

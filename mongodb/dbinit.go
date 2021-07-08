@@ -6,6 +6,8 @@ import (
 
 	"github.com/anyswap/CrossChain-Bridge/log"
 	"gopkg.in/mgo.v2"
+
+	"github.com/gaozhengxin/bridgeAccounting/params"
 )
 
 var (
@@ -21,12 +23,12 @@ func HasSession() bool {
 }
 
 // MongoServerInit int mongodb server session
-func MongoServerInit(addrs []string, dbname, user, pass string) {
+func MongoServerInit(cfg *params.ScanConfig, addrs []string, dbname, user, pass string) {
 	initDialInfo(addrs, dbname, user, pass)
-	mongoConnect()
-	initCollections()
-	initCollections2()
-	go checkMongoSession()
+	mongoConnect(cfg)
+	initCollections(cfg)
+	initCollections2(cfg)
+	go checkMongoSession(cfg)
 }
 
 func initDialInfo(addrs []string, db, user, pass string) {
@@ -38,7 +40,7 @@ func initDialInfo(addrs []string, db, user, pass string) {
 	}
 }
 
-func mongoConnect() {
+func mongoConnect(cfg *params.ScanConfig) {
 	if session != nil { // when reconnect
 		session.Close()
 	}
@@ -55,19 +57,19 @@ func mongoConnect() {
 	session.SetMode(mgo.Monotonic, true)
 	session.SetSafe(&mgo.Safe{FSync: true})
 	database = session.DB(dialInfo.Database)
-	deinintCollections()
-	deinintCollections2()
+	deinintCollections(cfg)
+	deinintCollections2(cfg)
 	log.Info("[mongodb] connect database finished.", "dbName", dialInfo.Database)
 }
 
 // fix 'read tcp 127.0.0.1:43502->127.0.0.1:27917: i/o timeout'
-func checkMongoSession() {
+func checkMongoSession(cfg *params.ScanConfig) {
 	for {
 		time.Sleep(60 * time.Second)
-		if err := ensureMongoConnected(); err != nil {
+		if err := ensureMongoConnected(cfg); err != nil {
 			log.Info("[mongodb] check session error", "err", err)
 			log.Info("[mongodb] reconnect database", "dbName", dialInfo.Database)
-			mongoConnect()
+			mongoConnect(cfg)
 		}
 	}
 }
@@ -88,14 +90,14 @@ func sessionPing() (err error) {
 	return err
 }
 
-func ensureMongoConnected() (err error) {
+func ensureMongoConnected(cfg *params.ScanConfig) (err error) {
 	err = sessionPing()
 	if err != nil {
 		log.Error("[mongodb] session ping error", "err", err)
 		log.Info("[mongodb] refresh session.", "dbName", dialInfo.Database)
 		session.Refresh()
 		database = session.DB(dialInfo.Database)
-		deinintCollections()
+		deinintCollections(cfg)
 		err = sessionPing()
 	}
 	return err

@@ -1,7 +1,7 @@
 package accounting
 
 import (
-	"github.com/gaozhengxin/bridgeaudit/mongodb"
+	"github.com/gaozhengxin/bridgeAccounting/mongodb"
 )
 
 var (

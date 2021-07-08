@@ -1,7 +1,7 @@
 package mongodb
 
 import (
-	"github.com/gaozhengxin/bridgeaudit/params"
+	"github.com/gaozhengxin/bridgeAccounting/params"
 )
 
 /*
@@ -18,19 +18,19 @@ const (
 	tbSyncInfo string = "SyncInfo"
 )
 
-func tbDeposit(tokenCfg *param.TokenConfig) string {
+func tbDeposit(tokenCfg *params.TokenConfig) string {
 	return "Deposit_" + tokenCfg.PairID
 }
 
-func tbRedeemed(tokenCfg *param.TokenConfig) string {
+func tbRedeemed(tokenCfg *params.TokenConfig) string {
 	return "Redeemed_" + tokenCfg.PairID
 }
 
-func tbMint(tokenCfg *param.TokenConfig) string {
+func tbMint(tokenCfg *params.TokenConfig) string {
 	return "Mint_" + tokenCfg.PairID
 }
 
-func tbBurn(tokenCfg *param.TokenConfig) string {
+func tbBurn(tokenCfg *params.TokenConfig) string {
 	return "Burn_" + tokenCfg.PairID
 }
 

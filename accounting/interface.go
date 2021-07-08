@@ -1,8 +1,8 @@
 package accounting
 
 import (
-	"github.com/gaozhengxin/bridgeaudit/params"
-	"github.com/gaozhengxin/bridgeaudit/mongodb"
+	"github.com/gaozhengxin/bridgeAccounting/params"
+	"github.com/gaozhengxin/bridgeAccounting/mongodb"
 )
 
 type AccountingAPI interface {
@@ -15,5 +15,5 @@ type AccountingQueryAPI interface {
 	GetSummaryInfo()
 	GetSummaryInfoByTag()
 	GetSummary(*params.TokenConfig)
-	GetSummarysByTimeRange(*params.TokenConfig, start, end int64) ([]*mongodb.SummaryInfo)
+	GetSummarysByTimeRange(tk *params.TokenConfig, start, end int64) ([]*mongodb.SummaryInfo)
 }

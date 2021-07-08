@@ -11,13 +11,6 @@ import (
 	"github.com/anyswap/CrossChain-Bridge/log"
 )
 
-// swap tx types
-const (
-	TxSwapin   = "swapin"
-	TxSwapout  = "swapout"
-	TxSwapout2 = "swapout2"
-)
-
 var (
 	configFile string
 	scanConfig = &ScanConfig{}
@@ -45,7 +38,7 @@ type ScanConfig struct {
 
 // TokenConfig token config
 type TokenConfig struct {
-	TxType         string
+	IsSrcToken bool
 	PairID         string
 	SwapServer     string
 	CallByContract string `toml:",omitempty" json:",omitempty"`
@@ -132,7 +125,7 @@ func (c *ScanConfig) CheckConfig() (err error) {
 		if tokenCfg.CallByContract != "" {
 			continue
 		}
-		pairIDKey := strings.ToLower(fmt.Sprintf("%v:%v:%v:%v", tokenCfg.TokenAddress, tokenCfg.PairID, tokenCfg.TxType, tokenCfg.SwapServer))
+		pairIDKey := strings.ToLower(fmt.Sprintf("%v:%v:%v:%v", tokenCfg.TokenAddress, tokenCfg.PairID, tokenCfg.SwapServer))
 		if _, exist = pairIDMap[pairIDKey]; exist {
 			return errors.New("duplicate pairID config" + pairIDKey)
 		}
@@ -150,9 +143,6 @@ func (c *ScanConfig) CheckConfig() (err error) {
 
 // CheckConfig check token config
 func (c *TokenConfig) CheckConfig() error {
-	if c.TxType == "" {
-		return errors.New("empty 'TxType'")
-	}
 	if c.PairID == "" {
 		return errors.New("empty 'PairID'")
 	}
@@ -161,9 +151,6 @@ func (c *TokenConfig) CheckConfig() error {
 	}
 	if c.CallByContract != "" && !common.IsHexAddress(c.CallByContract) {
 		return errors.New("wrong 'CallByContract' " + c.CallByContract)
-	}
-	if c.TxType == TxSwapin && c.CallByContract != "" && c.TokenAddress == "" {
-		c.TokenAddress = c.CallByContract // assign token address for swapin if empty
 	}
 	if !c.IsNativeToken() && !common.IsHexAddress(c.TokenAddress) {
 		return errors.New("wrong 'TokenAddress' " + c.TokenAddress)

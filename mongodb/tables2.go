@@ -1,7 +1,7 @@
 package mongodb
 
 import (
-	"github.com/gaozhengxin/bridgeaudit/params"
+	"github.com/gaozhengxin/bridgeAccounting/params"
 )
 
 const (
@@ -9,7 +9,7 @@ const (
 	tbSummaryCollectionInfo string = "SummaryCollectionInfo"
 )
 
-func tbSummary(tokenCfg *param.TokenConfig) string {
+func tbSummary(tokenCfg *params.TokenConfig) string {
 	return "CheckRange_" + tokenCfg.PairID
 }
 

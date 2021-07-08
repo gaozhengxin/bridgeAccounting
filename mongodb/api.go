@@ -17,19 +17,19 @@ type SwapEventIterImpl struct {
 	*mgo.Iter
 }
 
-func (iter *SwapEventIterImpl) Next(dst *SwapEvent) bool {
+func (iter SwapEventIterImpl) Next(dst *SwapEvent) bool {
 	return iter.Iter.Next(dst)
 }
 
-type SummaryImpl struct {
+type SummaryIterImpl struct {
 	*mgo.Iter
 }
 
-func (iter *SummaryImpl) Next(dst *SwapEvent) bool {
+func (iter *SummaryIterImpl) Next(dst *Summary) bool {
 	return iter.Iter.Next(dst)
 }
 
-func wrapError(err error, tag ...string) {
+func wrapError(err error, tag ...string) error {
 	return errors.Wrap(err, fmt.Sprintf("[mongo db] %s", tag))
 }
 
@@ -54,7 +54,7 @@ const (
 	TypeRedeemed
 )
 
-func selectCollection(txtype TxType, tokenCfg *param.TokenConfig) (*mgo.Collection, error) {
+func selectCollection(txtype TxType, tokenCfg *params.TokenConfig) (*mgo.Collection, error) {
 	var coll *mgo.Collection
 	switch txtype {
 	case TypeDeposit:
@@ -80,16 +80,17 @@ type SyncAPIImpl struct {
 
 type QueryAPIImpl struct {
 	*BaseQueryAPIImpl
-	*AccountingQueryAPI
+	*AccountingQueryAPIImpl
 }
 
 type AccountingAPIImpl struct {
-	*AccountingQueryAPI
+	*BaseQueryAPIImpl
+	*AccountingQueryAPIImpl
 }
 
 type BaseQueryAPIImpl struct{}
 
-type AccountingQueryAPI struct{}
+type AccountingQueryAPIImpl struct{}
 
 func (*BaseQueryAPIImpl) GetSyncInfo() (*SyncInfo, error) {
 	result := new(SyncInfo)
@@ -97,10 +98,10 @@ func (*BaseQueryAPIImpl) GetSyncInfo() (*SyncInfo, error) {
 	if err != nil {
 		return nil, wrapError(err, "GetSyncInfo")
 	}
-	return result.nil
+	return result, nil
 }
 
-func getSwapEvent(txtype TxType, tokenCfg *param.TokenConfig, txhash string) (*SwapEvent, error) {
+func getSwapEvent(txtype TxType, tokenCfg *params.TokenConfig, txhash string) (*SwapEvent, error) {
 	coll, err := selectCollection(txtype, tokenCfg)
 	if err != nil {
 		return nil, wrapError(err, "getSwapEvent", "selectCollection")
@@ -117,8 +118,8 @@ func getSwapEvent(txtype TxType, tokenCfg *param.TokenConfig, txhash string) (*S
 
 func getSwapEventByBlockRange(
 	txtype TxType,
-	tokenCfg *param.TokenConfig,
-	start, end int64) (*SwapEventIter, error) {
+	tokenCfg *params.TokenConfig,
+	start, end int64) (SwapEventIter, error) {
 	coll, err := selectCollection(txtype, tokenCfg)
 	if err != nil {
 		return nil, wrapError(err, "getSwapEventByBlockRange", "selectCollection")
@@ -134,8 +135,8 @@ func getSwapEventByBlockRange(
 
 func getSwapEventByTimeRange(
 	txtype TxType,
-	tokenCfg *param.TokenConfig,
-	start, end int64) (*SwapEventIter, error) {
+	tokenCfg *params.TokenConfig,
+	start, end int64) (SwapEventIter, error) {
 	coll, err := selectCollection(txtype, tokenCfg)
 	if err != nil {
 		return nil, wrapError(err, "getSwapEventByTimeRange", "selectCollection")
@@ -151,9 +152,9 @@ func getSwapEventByTimeRange(
 
 func getSwapEventByUserTimeRange(
 	txtype TxType,
-	tokenCfg *param.TokenConfig,
+	tokenCfg *params.TokenConfig,
 	user string,
-	start, end int64) (*SwapEventIter, error) {
+	start, end int64) (SwapEventIter, error) {
 	coll, err := selectCollection(txtype, tokenCfg)
 	if err != nil {
 		return nil, wrapError(err, "getSwapEventByUserTimeRange", "selectCollection")
@@ -169,93 +170,93 @@ func getSwapEventByUserTimeRange(
 	return swapEventIter, nil
 }
 
-func (*BaseQueryAPIImpl) GetDeposit(tokenCfg *param.TokenConfig, txhash string) (*SwapEvent, error) {
+func (*BaseQueryAPIImpl) GetDeposit(tokenCfg *params.TokenConfig, txhash string) (*SwapEvent, error) {
 	return getSwapEvent(TypeDeposit, tokenCfg, txhash)
 }
 
 func (*BaseQueryAPIImpl) GetDepositsByBlockRange(
-	tokenCfg *param.TokenConfig,
-	start, end int64) (*SwapEventIter, error) {
+	tokenCfg *params.TokenConfig,
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByBlockRange(TypeDeposit, tokenCfg, start, end)
 }
 
 func (*BaseQueryAPIImpl) GetDepositsByTimeRange(
-	tokenCfg *param.TokenConfig,
-	start, end int64) (*SwapEventIter, error) {
+	tokenCfg *params.TokenConfig,
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByTimeRange(TypeDeposit, tokenCfg, start, end)
 }
 
 func (*BaseQueryAPIImpl) GetDepositByUserTimeRange(
-	tokenCfg *param.TokenConfig,
+	tokenCfg *params.TokenConfig,
 	user string,
-	start, end int64) (*SwapEventIter, error) {
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByUserTimeRange(TypeDeposit, tokenCfg, user, start, end)
 }
 
-func (*BaseQueryAPIImpl) GetMint(tokenCfg *param.TokenConfig, txhash string) (*SwapEvent, error) {
+func (*BaseQueryAPIImpl) GetMint(tokenCfg *params.TokenConfig, txhash string) (*SwapEvent, error) {
 	return getSwapEvent(TypeMint, tokenCfg, txhash)
 }
 
-func (*BaseQueryAPIImpl) GetMintByBlockRange(tokenCfg *param.TokenConfig,
-	start, end int64) (*SwapEventIter, error) {
+func (*BaseQueryAPIImpl) GetMintByBlockRange(tokenCfg *params.TokenConfig,
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByBlockRange(TypeMint, tokenCfg, start, end)
 }
 
 func (*BaseQueryAPIImpl) GetMintByTimeRange(
-	tokenCfg *param.TokenConfig,
-	start, end int64) (*SwapEventIter, error) {
+	tokenCfg *params.TokenConfig,
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByTimeRange(TypeMint, tokenCfg, start, end)
 }
 
 func (*BaseQueryAPIImpl) GetMintByUserTimeRange(
-	tokenCfg *param.TokenConfig,
+	tokenCfg *params.TokenConfig,
 	user string,
-	start, end int64) (*SwapEventIter, error) {
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByUserTimeRange(TypeMint, tokenCfg, user, start, end)
 }
 
-func (*BaseQueryAPIImpl) GetBurn(tokenCfg *param.TokenConfig, txhash string) (*SwapEvent, error) {
+func (*BaseQueryAPIImpl) GetBurn(tokenCfg *params.TokenConfig, txhash string) (*SwapEvent, error) {
 	return getSwapEvent(TypeBurn, tokenCfg, txhash)
 }
 
-func (*BaseQueryAPIImpl) GetBurnByBlockRange(tokenCfg *param.TokenConfig,
-	start, end int64) (*SwapEventIter, error) {
+func (*BaseQueryAPIImpl) GetBurnByBlockRange(tokenCfg *params.TokenConfig,
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByBlockRange(TypeBurn, tokenCfg, start, end)
 }
 
-func (*BaseQueryAPIImpl) GetBurnByTimeRange(tokenCfg *param.TokenConfig,
-	start, end int64) (*SwapEventIter, error) {
+func (*BaseQueryAPIImpl) GetBurnByTimeRange(tokenCfg *params.TokenConfig,
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByTimeRange(TypeBurn, tokenCfg, start, end)
 }
 
-func (*BaseQueryAPIImpl) GetBurnByUserTimeRange(tokenCfg *param.TokenConfig,
+func (*BaseQueryAPIImpl) GetBurnByUserTimeRange(tokenCfg *params.TokenConfig,
 	user string,
-	start, end int64) (*SwapEventIter, error) {
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByUserTimeRange(TypeBurn, tokenCfg, user, start, end)
 }
 
-func (*BaseQueryAPIImpl) GetRedeemed(tokenCfg *param.TokenConfig, txhash string) (*SwapEvent, error) {
+func (*BaseQueryAPIImpl) GetRedeemed(tokenCfg *params.TokenConfig, txhash string) (*SwapEvent, error) {
 	return getSwapEvent(TypeRedeemed, tokenCfg, txhash)
 }
 
-func (*BaseQueryAPIImpl) GetRedeemedByBlockRange(tokenCfg *param.TokenConfig,
-	start, end int64) (*SwapEventIter, error) {
+func (*BaseQueryAPIImpl) GetRedeemedByBlockRange(tokenCfg *params.TokenConfig,
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByBlockRange(TypeRedeemed, tokenCfg, start, end)
 }
 
-func (*BaseQueryAPIImpl) GetRedeemedByTimeRange(tokenCfg *param.TokenConfig,
-	start, end int64) (*SwapEventIter, error) {
+func (*BaseQueryAPIImpl) GetRedeemedByTimeRange(tokenCfg *params.TokenConfig,
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByTimeRange(TypeRedeemed, tokenCfg, start, end)
 }
 
-func (*BaseQueryAPIImpl) GetRedeemedByUserTimeRange(tokenCfg *param.TokenConfig,
+func (*BaseQueryAPIImpl) GetRedeemedByUserTimeRange(tokenCfg *params.TokenConfig,
 	user string,
-	start, end int64) (*SwapEventIter, error) {
+	start, end int64) (SwapEventIter, error) {
 	return getSwapEventByUserTimeRange(TypeRedeemed, tokenCfg, user, start, end)
 }
 
 func (*SyncAPIImpl) SetStartHeight(srcStartHeight, dstStartHeight int64) error {
-	info, err := collSyncInfo.UpsertID(
+	info, err := collSyncInfo.UpsertId(
 		bson.M{"_id": syncInfoID},
 		bson.M{"$set": bson.M{"src_start_height": srcStartHeight, "dst_start_height": dstStartHeight}})
 	if err != nil {
@@ -265,7 +266,7 @@ func (*SyncAPIImpl) SetStartHeight(srcStartHeight, dstStartHeight int64) error {
 }
 
 func (*SyncAPIImpl) UpdateSyncedHeight(srcSyncedHeight, dstSyncedHeight int64) error {
-	info, err := collSyncInfo.UpsertID(
+	info, err := collSyncInfo.UpsertId(
 		bson.M{"_id": syncInfoID},
 		bson.M{"$set": bson.M{"src_synced_height": srcSyncedHeight, "dst_synced_height": dstSyncedHeight}})
 	if err != nil {
@@ -274,10 +275,10 @@ func (*SyncAPIImpl) UpdateSyncedHeight(srcSyncedHeight, dstSyncedHeight int64) e
 	return nil
 }
 
-func addSwapEvent(txtype TxType, tokenCfg *param.TokenConfig, data SwapEvent) error {
+func addSwapEvent(txtype TxType, tokenCfg *params.TokenConfig, data *SwapEvent) error {
 	coll, err := selectCollection(txtype, tokenCfg)
 	if err != nil {
-		return nil, wrapError(err, "addSwapEvent", "selectCollection")
+		return wrapError(err, "addSwapEvent", "selectCollection")
 	}
 
 	err = coll.Insert(data)
@@ -287,19 +288,19 @@ func addSwapEvent(txtype TxType, tokenCfg *param.TokenConfig, data SwapEvent) er
 	return nil
 }
 
-func (*SyncAPIImpl) AddDeposit(tokenCfg *param.TokenConfig, data SwapEvent) error {
+func (*SyncAPIImpl) AddDeposit(tokenCfg *params.TokenConfig, data *SwapEvent) error {
 	return addSwapEvent(TypeDeposit, tokenCfg, data)
 }
 
-func (*SyncAPIImpl) AddMint(tokenCfg *param.TokenConfig, data SwapEvent) error {
+func (*SyncAPIImpl) AddMint(tokenCfg *params.TokenConfig, data *SwapEvent) error {
 	return addSwapEvent(TypeMint, tokenCfg, data)
 }
 
-func (*SyncAPIImpl) AddBurn(tokenCfg *param.TokenConfig, data SwapEvent) error {
+func (*SyncAPIImpl) AddBurn(tokenCfg *params.TokenConfig, data *SwapEvent) error {
 	return addSwapEvent(TypeBurn, tokenCfg, data)
 }
 
-func (*SyncAPIImpl) AddRedeemed(tokenCfg *param.TokenConfig, data SwapEvent) error {
+func (*SyncAPIImpl) AddRedeemed(tokenCfg *params.TokenConfig, data *SwapEvent) error {
 	return addSwapEvent(TypeRedeemed, tokenCfg, data)
 }
 
@@ -321,8 +322,8 @@ func (*AccountingQueryAPIImpl) GetSummaryInfo(sequence int64) (*SummaryInfo, err
 	return result, nil
 }
 
-func (*AccountingQueryAPIImpl) GetSummary(tokenCfg *param.TokenConfig, sequence int64) (*Summary, error) {
-	coll := collSummarys(tokenCfg)
+func (*AccountingQueryAPIImpl) GetSummary(tokenCfg *params.TokenConfig, sequence int64) (*Summary, error) {
+	coll := collSummarys[tokenCfg.PairID]
 	if coll == nil {
 		return nil, wrapError(fmt.Errorf("collection not initiated, pairID: %v", tokenCfg.PairID), "GetSummary")
 	}
@@ -334,8 +335,8 @@ func (*AccountingQueryAPIImpl) GetSummary(tokenCfg *param.TokenConfig, sequence 
 	return result, nil
 }
 
-func (*AccountingQueryAPIImpl) GetSummarysBySequenceRange(tokenCfg *param.TokenConfig, start, end int64) (*SummaryIter, error) {
-	coll := collSummarys(tokenCfg)
+func (*AccountingQueryAPIImpl) GetSummarysBySequenceRange(tokenCfg *params.TokenConfig, start, end int64) (SummaryIter, error) {
+	coll := collSummarys[tokenCfg.PairID]
 	if coll == nil {
 		return nil, wrapError(fmt.Errorf("collection not initiated, pairID: %v", tokenCfg.PairID), "GetSummarysBySequenceRange")
 	}
@@ -346,23 +347,23 @@ func (*AccountingQueryAPIImpl) GetSummarysBySequenceRange(tokenCfg *param.TokenC
 	return summaryIter, nil
 }
 
-func (*AccountingAPIImpl) AddSummary(tokenCfg *param.TokenConfig, summary *Summary) error {
-	coll := collSummarys(tokenCfg)
+func (*AccountingAPIImpl) AddSummary(tokenCfg *params.TokenConfig, summary *Summary) error {
+	coll := collSummarys[tokenCfg.PairID]
 	if coll == nil {
-		return nil, wrapError(fmt.Errorf("collection not initiated, pairID: %v", tokenCfg.PairID), GetSummary)
+		return wrapError(fmt.Errorf("collection not initiated, pairID: %v", tokenCfg.PairID), "AddSummary")
 	}
 	return nil
 }
 
 func (*AccountingAPIImpl) UpdateSummary(
-	tokenCfg *param.TokenConfig,
+	tokenCfg *params.TokenConfig,
 	accDeposit,
 	accMint,
 	accBurn,
 	accRedeemed float64) error {
-	coll := collSummarys(tokenCfg)
+	coll := collSummarys[tokenCfg.PairID]
 	if coll == nil {
-		return nil, wrapError(fmt.Errorf("collection not initiated, pairID: %v", tokenCfg.PairID), GetSummary)
+		return wrapError(fmt.Errorf("collection not initiated, pairID: %v", tokenCfg.PairID), "UpdateSummary")
 	}
 	return nil
 }
@@ -376,7 +377,7 @@ func (*AccountingAPIImpl) AddSummaryInfo(data *SummaryInfo) error {
 }
 
 func (*AccountingAPIImpl) UpdateSummaryCollectionInfo(latestSequence int64) error {
-	info, err := collSummaryCollectionInfo.UpsertID(
+	info, err := collSummaryCollectionInfo.UpsertId(
 		bson.M{"_id": summaryCollectionInfoID},
 		bson.M{"$set": latestSequence},
 	)

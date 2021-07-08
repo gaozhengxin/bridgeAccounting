@@ -1,8 +1,9 @@
 package mongodb
 
 import (
-	"github.com/gaozhengxin/bridgeaudit/params"
 	"gopkg.in/mgo.v2"
+
+	"github.com/gaozhengxin/bridgeAccounting/params"
 )
 
 var (
@@ -13,35 +14,35 @@ var (
 	collBurns     = make(map[string]*mgo.Collection)
 )
 
-func collDeposit(tokenCfg *param.TokenConfig) *mgo.Collection {
+func collDeposit(tokenCfg *params.TokenConfig) *mgo.Collection {
 	return collDeposits[tokenCfg.PairID]
 }
 
-func collRedeemed(tokenCfg *param.TokenConfig) *mgo.Collection {
+func collRedeemed(tokenCfg *params.TokenConfig) *mgo.Collection {
 	return collRedeemeds[tokenCfg.PairID]
 }
 
-func collMint(tokenCfg *param.TokenConfig) *mgo.Collection {
+func collMint(tokenCfg *params.TokenConfig) *mgo.Collection {
 	return collMints[tokenCfg.PairID]
 }
 
-func collBurn(tokenCfg *param.TokenConfig) *mgo.Collection {
+func collBurn(tokenCfg *params.TokenConfig) *mgo.Collection {
 	return collBurns[tokenCfg.PairID]
 }
 
 // do this when reconnect to the database
-func deinintCollections() {
+func deinintCollections(scanConfig *params.ScanConfig) {
 	collSyncInfo = database.C(tbSyncInfo)
 	for _, tk := range scanConfig.Tokens {
-		collDeposit(tk) = database.C(tbDeposit(tk))
-		collRedeemed(tk) = database.C(tbRedeemed(tk))
-		collMint(tk) = database.C(tbMint(tk))
-		collBurn(tk) = database.C(tbBurn(tk))
+		collDeposits[tk.PairID] = database.C(tbDeposit(tk))
+		collRedeemeds[tk.PairID] = database.C(tbRedeemed(tk))
+		collMints[tk.PairID] = database.C(tbMint(tk))
+		collBurns[tk.PairID] = database.C(tbBurn(tk))
 	}
 }
 
-func initCollections(scanConfig *ScanConfig) {
-	initCollection(tbSyncInfo, &collSyncInfo)
+func initCollections(scanConfig *params.ScanConfig) {
+	initCollection(tbSyncInfo, collSyncInfo)
 	for _, tk := range scanConfig.Tokens {
 		initCollection(tbDeposit(tk), collDeposit(tk))
 		initCollection(tbRedeemed(tk), collRedeemed(tk))
@@ -50,9 +51,9 @@ func initCollections(scanConfig *ScanConfig) {
 	}
 }
 
-func initCollection(table string, collection **mgo.Collection, indexKey ...string) {
-	*collection = database.C(table)
+func initCollection(table string, collection *mgo.Collection, indexKey ...string) {
+	collection = database.C(table)
 	if len(indexKey) != 0 && indexKey[0] != "" {
-		_ = (*collection).EnsureIndexKey(indexKey...)
+		_ = (collection).EnsureIndexKey(indexKey...)
 	}
 }

@@ -1,11 +1,16 @@
 package scanner
 
 import (
+	"context"
+	"math"
 	"math/big"
 	"strings"
 
-	"github.com/gaozhengxin/bridgeaudit/params"
-	"github.com/gaozhengxin/bridgeaudit/mongodb"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/gaozhengxin/bridgeAccounting/params"
+	"github.com/gaozhengxin/bridgeAccounting/mongodb"
 )
 
 func convertToMgoSwapEvent(swapEvent *SwapEvent, decimal int) *mongodb.SwapEvent {
@@ -19,7 +24,7 @@ func convertToMgoSwapEvent(swapEvent *SwapEvent, decimal int) *mongodb.SwapEvent
 	}
 }
 
-func cachedDecimal(tokenCfg *params.TokenConfig) int {
+func (scanner *ethSwapScanner) cachedDecimal(tokenCfg *params.TokenConfig) int {
 	if tokenCfg.Decimal != 0 {
 		return tokenCfg.Decimal
 	}
@@ -29,9 +34,9 @@ func cachedDecimal(tokenCfg *params.TokenConfig) int {
 	}
 	methodDecimal := common.FromHex("0x313ce567")
 	msg := ethereum.CallMsg {
-		To: common.FromHex(tokenCfg.TokenAddress),
 		Data: methodDecimal[:],
 	}
+	*msg.To = common.HexToAddress(tokenCfg.TokenAddress)
 	bs, err := scanner.client.CallContract(context.Background(), msg, nil)
 	if err != nil {
 		return 0
@@ -42,8 +47,10 @@ func cachedDecimal(tokenCfg *params.TokenConfig) int {
 }
 
 func toFloat(bigint *big.Int, decimal int) float64 {
-	divider := new(big.Int).SetInt64(10**decimal)
-	quo, rem := new(big.Int)
+	divider := new(big.Int).SetInt64(10)
+	divider = new(big.Int).Exp(divider, big.NewInt(int64(decimal)), nil)
+	quo := new(big.Int)
+	rem := new(big.Int)
 	quo, rem = quo.DivMod(bigint, divider, rem)
-	return float64(quo.Int64()) + float64(rem.Int64())/(10**decimal)
+	return float64(quo.Int64()) + float64(rem.Int64())/math.Pow10(decimal)
 }

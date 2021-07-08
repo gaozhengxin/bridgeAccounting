@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/anyswap/CrossChain-Bridge/cmd/utils"
-	"github.com/gaozhengxin/bridgeaudit/params"
-	"github.com/gaozhengxin/bridgeaudit/scanner"
+	"github.com/gaozhengxin/bridgeAccounting/params"
+	"github.com/gaozhengxin/bridgeAccounting/scanner"
 	"github.com/urfave/cli/v2"
 )
 
@@ -22,7 +22,7 @@ func initApp() {
 	app.HideVersion = true
 	app.Usage = "scan eth like blockchain"
 	app.Commands = []*cli.Command{
-		scanner.ScanSwapCommand,
+		//scanner.ScanSwapCommand,
 		scanner.VersionCommand,
 	}
 	app.Flags = []cli.Flag{

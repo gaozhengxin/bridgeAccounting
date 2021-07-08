@@ -13,13 +13,13 @@ import (
 	"github.com/anyswap/CrossChain-Bridge/cmd/utils"
 	"github.com/anyswap/CrossChain-Bridge/log"
 	"github.com/anyswap/CrossChain-Bridge/tokens"
-	"github.com/fsn-dev/fsn-go-sdk/efsn/common"
-	"github.com/fsn-dev/fsn-go-sdk/efsn/core/types"
-	"github.com/fsn-dev/fsn-go-sdk/efsn/ethclient"
-	ethereum "github.com/fsn-dev/fsn-go-sdk/efsn"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	//ethereum "github.com/fsn-dev/fsn-go-sdk/efsn"
 	"github.com/gaozhengxin/bridgeAccounting/params"
 	"github.com/gaozhengxin/bridgeAccounting/mongodb"
-	"github.com/gaozhengxin/bridgeAccounting/tools"
+	//"github.com/gaozhengxin/bridgeAccounting/tools"
 	"github.com/gaozhengxin/bridgeAccounting/accounting"
 	"github.com/urfave/cli/v2"
 )
@@ -71,7 +71,7 @@ scan cross chain swaps
 	transferLogTopic       = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
 
 	// 1. Mint log
-	swapInLogTopic = common.HexToHash("0x05d0634fe981be85c22e2942a880821b70095d84e152c3ea3c17a4e4250d9d61")
+	swapinLogTopic = common.HexToHash("0x05d0634fe981be85c22e2942a880821b70095d84e152c3ea3c17a4e4250d9d61")
 
 	// 2. Burn log
 	addressSwapoutLogTopic = common.HexToHash("0x6b616089d04950dc06c45c6dd787d657980543f89651aec47924752c7d16c888")
@@ -101,6 +101,8 @@ type ethSwapScanner struct {
 
 	rpcInterval   time.Duration
 	rpcRetryCount int
+
+	chainId *big.Int
 }
 
 var (
@@ -128,13 +130,13 @@ func start(ctx *cli.Context) error {
 		rpcInterval:   1 * time.Second,
 		rpcRetryCount: 3,
 	}
-	srcScanner.gateway = ctg.SrcGateway
+	srcScanner.gateway = cfg.SrcGateway
 	srcScanner.scanReceipt = cfg.SrcScanReceipt
 	srcScanner.startHeightArgument = cfg.SrcStartHeightArgument
 	srcScanner.endHeight = uint64(cfg.SrcEndHeight)
 	srcScanner.stableHeight = uint64(cfg.SrcStableHeight)
 	srcScanner.jobCount = uint64(cfg.SrcJobCount)
-	srcScanner.processBlockTimeout = uint64(cfg.SrcProcessBlockTimeout)
+	srcScanner.processBlockTimeout = time.Duration(cfg.SrcProcessBlockTimeout) * time.Second
 
 	log.Info("get src argument success",
 		"gateway", srcScanner.gateway,
@@ -151,13 +153,13 @@ func start(ctx *cli.Context) error {
 		rpcInterval:   1 * time.Second,
 		rpcRetryCount: 3,
 	}
-	dstScanner.gateway = ctg.DstGateway
+	dstScanner.gateway = cfg.DstGateway
 	dstScanner.scanReceipt = cfg.DstScanReceipt
 	dstScanner.startHeightArgument = cfg.DstStartHeightArgument
 	dstScanner.endHeight = uint64(cfg.DstEndHeight)
 	dstScanner.stableHeight = uint64(cfg.DstStableHeight)
 	dstScanner.jobCount = uint64(cfg.DstJobCount)
-	dstScanner.processBlockTimeout = uint64(cfg.DstProcessBlockTimeout)
+	dstScanner.processBlockTimeout = time.Duration(cfg.DstProcessBlockTimeout) * time.Second
 
 	log.Info("get dst argument success",
 		"gateway", dstScanner.gateway,
@@ -169,12 +171,12 @@ func start(ctx *cli.Context) error {
 		"timeout", dstScanner.processBlockTimeout,
 	)
 
-	scanner.initClient()
-	select {
-		go srcScanner.run()
-		go dstScanner.run()
-		go accounting()
-	}
+	srcScanner.initClient()
+	dstScanner.initClient()
+	go srcScanner.run()
+	go dstScanner.run()
+	go accounting.StartAccounting()
+	select {}
 	return nil
 }
 
@@ -396,6 +398,11 @@ type SwapEvent struct {
 
 func (scanner *ethSwapScanner) verifyTransaction(tx *types.Transaction, receipt *types.Receipt, tokenCfg *params.TokenConfig) (txType SwapTxType, swapData *SwapEvent, verifyErr error) {
 	txTo := tx.To().Hex()
+	txmsg, err := tx.AsMessage(types.NewEIP155Signer(scanner.chainId), nil)
+	if err != nil {
+		return TypeNull, nil, verifyErr
+	}
+	txFrom := txmsg.From()
 	cmpTxTo := tokenCfg.TokenAddress
 	depositAddress := tokenCfg.DepositAddress
 
@@ -413,53 +420,63 @@ func (scanner *ethSwapScanner) verifyTransaction(tx *types.Transaction, receipt 
 	}
 
 	switch {
-	case depositAddress != "":
+	case tokenCfg.IsSrcToken:
+		// Src chain, Deposit or Redeemed
 		if tokenCfg.IsNativeToken() {
-			// Src chain, Deposit or Redeemed
-			// TODO
 			matched := strings.EqualFold(txTo, depositAddress)
 			if matched {
+				// deposit native
 				swapData = &SwapEvent{
-					TxHash: strings.ToLower(tx.Hash().String()),
-					BlockTime: getBlockTimestamp(receipt.BlockNumber.ToInt()),
+					TxHash: tx.Hash(),
+					BlockTime: scanner.getBlockTimestamp(receipt.BlockNumber),
 					BlockNumber: receipt.BlockNumber,
 					Amount: tx.Value(),
-					User: tx.From(),
+					User: txFrom,
 				}
 				return TypeDeposit, swapData, nil
+			} else if strings.EqualFold(txFrom.Hex(), depositAddress) {
+				// redeemed native
+				swapData = &SwapEvent{
+					TxHash: tx.Hash(),
+					BlockTime: scanner.getBlockTimestamp(receipt.BlockNumber),
+					BlockNumber: receipt.BlockNumber,
+					Amount: tx.Value(),
+					User: *tx.To(),
+				}
+				return TypeRedeemed, swapData, nil
 			}
 			return TypeNull, nil, nil
 		} else if strings.EqualFold(txTo, cmpTxTo) {
-			swapData, verifyErr = scanner.verifyErc20SwapinTx(tx, receipt, tokenCfg)
-			if verifyErr == tokens.ErrTxWithWrongReceiver {
-				// swapin my have multiple deposit addresses for different bridges
-				return TypeNull, nil, verifyErr
-			}
-			return TypeDeposit, swapData, verifyErr
-		}
-	case redeemAddress != "":
-		// Dst chain, Mint or Burn
-		// TODO
-		switch {
-		case !scanner.scanReceipt:
-			if strings.EqualFold(txTo, cmpTxTo) {
-				swapData, verifyErr = scanner.verifySwapoutTx(tx, receipt, tokenCfg)
-				return TypeBurn, swapData, verifyErr
-			}
-		default:
-			swapData = &SwapEvent{
-				TxHash: strings.ToLower(tx.Hash().String()),
-				BlockTime: getBlockTimestamp(receipt.BlockNumber.ToInt()),
-				BlockNumber: receipt.BlockNumber,
-				Amount: nil,
-				User: common.Address{},
-			}
-			verifyErr = scanner.parseSwapoutTxLogs(receipt.Logs, tokenCfg, swapData)
-			if verifyErr == nil {
-				return TypeBurn, swapData, nil
+			if strings.EqualFold(txFrom.Hex(), depositAddress) == false {
+				swapData, verifyErr = scanner.verifyErc20SwapinTx(tx, receipt, tokenCfg)
+				if verifyErr == tokens.ErrTxWithWrongReceiver {
+					return TypeNull, nil, verifyErr
+				}
+				// deposit erc20
+				return TypeDeposit, swapData, verifyErr
+			} else {
+				swapData, verifyErr = scanner.verifyErc20RedeemTx(tx, receipt, tokenCfg)
+				// erc20 redeemed
+				return TypeRedeemed, swapData, verifyErr
 			}
 		}
 	default:
+		// Dst chain, Mint or Burn
+		if strings.EqualFold(txTo, cmpTxTo) {
+			if strings.EqualFold(txFrom.Hex(), depositAddress) {
+				// Mint
+				swapData, verifyErr = scanner.verifyMintTx(tx, receipt, tokenCfg)
+				return TypeMint, swapData, verifyErr
+			} else {
+				// Burn
+				swapData, verifyErr = scanner.verifySwapoutTx(tx, receipt, tokenCfg)
+				if verifyErr == tokens.ErrTxWithWrongReceiver {
+					return TypeNull, nil, verifyErr
+				}
+				return TypeBurn, swapData, verifyErr
+			}
+			return TypeNull, nil, verifyErr
+		}
 	}
 	return TypeNull, nil, verifyErr
 }
@@ -475,36 +492,11 @@ func (scanner *ethSwapScanner) printVerifyError(txHash string, verifyErr error) 
 	}
 }
 
-func (scanner *ethSwapScanner) getSwapoutFuncHashByTxType(txType string) []byte {
-	switch strings.ToLower(txType) {
-	case params.TxSwapout:
-		return addressSwapoutFuncHash
-	case params.TxSwapout2:
-		return stringSwapoutFuncHash
-	default:
-		log.Errorf("unknown swapout tx type %v", txType)
-		return nil
-	}
-}
-
-func (scanner *ethSwapScanner) getLogTopicByTxType(txType string) common.Hash {
-	switch strings.ToLower(txType) {
-	case params.TxSwapin:
-		return transferLogTopic
-	case params.TxSwapout:
-		return addressSwapoutLogTopic
-	case params.TxSwapout2:
-		return stringSwapoutLogTopic
-	default:
-		log.Errorf("unknown tx type %v", txType)
-		return common.Hash{}
-	}
-}
-
+// verify erc20 deposit
 func (scanner *ethSwapScanner) verifyErc20SwapinTx(tx *types.Transaction, receipt *types.Receipt, tokenCfg *params.TokenConfig) (swapData *SwapEvent, err error) {
 	swapData = &SwapEvent{
-		TxHash: strings.ToLower(tx.Hash().String()),
-		BlockTime: getBlockTimestamp(receipt.BlockNumber.ToInt()),
+		TxHash: tx.Hash(),
+		BlockTime: scanner.getBlockTimestamp(receipt.BlockNumber),
 		BlockNumber: receipt.BlockNumber,
 		Amount: nil,
 		User: common.Address{},
@@ -517,33 +509,68 @@ func (scanner *ethSwapScanner) verifyErc20SwapinTx(tx *types.Transaction, receip
 	return swapData, err
 }
 
-func (scanner *ethSwapScanner) verifySwapoutTx(tx *types.Transaction, receipt *types.Receipt, tokenCfg *params.TokenConfig) (swapData *SwapEvent, err error) {
+// verify erc20 redeemed
+func (scanner *ethSwapScanner) verifyErc20RedeemTx(tx *types.Transaction, receipt *types.Receipt, tokenCfg *params.TokenConfig) (swapData *SwapEvent, err error) {
 	swapData = &SwapEvent{
-		TxHash: strings.ToLower(tx.Hash().String()),
-		BlockTime: getBlockTimestamp(receipt.BlockNumber.ToInt()),
+		TxHash: tx.Hash(),
+		BlockTime: scanner.getBlockTimestamp(receipt.BlockNumber),
 		BlockNumber: receipt.BlockNumber,
 		Amount: nil,
 		User: common.Address{},
 	}
 	if receipt == nil {
-		err = scanner.parseSwapoutTxInput(tx.Data(), tokenCfg.TxType, swapData)
+		err = scanner.parseErc20RedeemTxInput(tx.Data(), tokenCfg.DepositAddress, swapData)
+	} else {
+		err = scanner.parseErc20RedeemTxLogs(receipt.Logs, tokenCfg, swapData)
+	}
+	return swapData, err
+}
+
+// verify burn
+func (scanner *ethSwapScanner) verifySwapoutTx(tx *types.Transaction, receipt *types.Receipt, tokenCfg *params.TokenConfig) (swapData *SwapEvent, err error) {
+	swapData = &SwapEvent{
+		TxHash: tx.Hash(),
+		BlockTime: scanner.getBlockTimestamp(receipt.BlockNumber),
+		BlockNumber: receipt.BlockNumber,
+		Amount: nil,
+		User: common.Address{},
+	}
+	if receipt == nil {
+		err = scanner.parseSwapoutTxInput(tx.Data(), swapData)
 	} else {
 		err = scanner.parseSwapoutTxLogs(receipt.Logs, tokenCfg, swapData)
 	}
 	return swapData, err
 }
 
+// verify mint
+func (scanner *ethSwapScanner) verifyMintTx(tx *types.Transaction, receipt *types.Receipt, tokenCfg *params.TokenConfig) (swapData *SwapEvent, err error) {
+	swapData = &SwapEvent{
+		TxHash: tx.Hash(),
+		BlockTime: scanner.getBlockTimestamp(receipt.BlockNumber),
+		BlockNumber: receipt.BlockNumber,
+		Amount: nil,
+		User: common.Address{},
+	}
+	if receipt == nil {
+		err = scanner.parseMintTxInput(tx.Data(), swapData)
+	} else {
+		err = scanner.parseMintTxLogs(receipt.Logs, tokenCfg, swapData)
+	}
+	return swapData, err
+}
+
 func (scanner *ethSwapScanner) parseErc20SwapinTxInput(input []byte, depositAddress string, swapData *SwapEvent) error {
 	if len(input) < 4 {
-		return nil, tokens.ErrTxWithWrongInput
+		return tokens.ErrTxWithWrongInput
 	}
 	var receiver string
 	funcHash := input[:4]
 	switch {
 	case bytes.Equal(funcHash, transferFuncHash):
-		receiver = common.BytesToAddress(common.GetData(input, 4, 32)).Hex()
+		receiver = common.BytesToAddress(GetData(input, 4, 32)).Hex()
 	case bytes.Equal(funcHash, transferFromFuncHash):
-		receiver = common.BytesToAddress(common.GetData(input, 36, 32)).Hex()
+		receiver = common.BytesToAddress(GetData(input, 36, 32)).Hex()
 	default:
 		return tokens.ErrTxFuncHashMismatch
 	}
@@ -556,7 +583,7 @@ func (scanner *ethSwapScanner) parseErc20SwapinTxInput(input []byte, depositAddr
 func (scanner *ethSwapScanner) parseErc20SwapinTxLogs(logs []*types.Log, tokenCfg *params.TokenConfig, swapData *SwapEvent) (err error) {
 	targetContract := tokenCfg.TokenAddress
 	depositAddress := tokenCfg.DepositAddress
-	cmpLogTopic := scanner.getLogTopicByTxType(tokenCfg.TxType)
+	cmpLogTopic := transferLogTopic
 
 	for _, rlog := range logs {
 		if rlog.Removed {
@@ -579,12 +606,51 @@ func (scanner *ethSwapScanner) parseErc20SwapinTxLogs(logs []*types.Log, tokenCf
 	return tokens.ErrDepositLogNotFound
 }
 
-func (scanner *ethSwapScanner) parseSwapoutTxInput(input []byte, txType string, swapData *SwapEvent) error {
+func (scanner *ethSwapScanner) parseErc20RedeemTxInput(input []byte, depositAddress string, swapData *SwapEvent) error {
+	if len(input) < 4 {
+		return tokens.ErrTxWithWrongInput
+	}
+	var receiver string
+	funcHash := input[:4]
+	switch {
+	case bytes.Equal(funcHash, transferFuncHash):
+		receiver = common.BytesToAddress(GetData(input, 4, 32)).Hex()
+	case bytes.Equal(funcHash, transferFromFuncHash):
+		receiver = common.BytesToAddress(GetData(input, 36, 32)).Hex()
+	default:
+		return tokens.ErrTxFuncHashMismatch
+	}
+	swapData.User = common.HexToAddress(receiver)
+	return nil
+}
+
+func (scanner *ethSwapScanner) parseErc20RedeemTxLogs(logs []*types.Log, tokenCfg *params.TokenConfig, swapData *SwapEvent) (err error) {
+	targetContract := tokenCfg.TokenAddress
+
+	for _, rlog := range logs {
+		if rlog.Removed {
+			continue
+		}
+		if !strings.EqualFold(rlog.Address.Hex(), targetContract) {
+			continue
+		}
+		if len(rlog.Topics) != 3 || rlog.Data == nil {
+			continue
+		}
+		if rlog.Topics[0] == transferLogTopic {
+			receiver := common.BytesToAddress(rlog.Topics[2][:]).Hex()
+			swapData.User = common.HexToAddress(receiver)
+		}
+	}
+	return tokens.ErrDepositLogNotFound
+}
+
+func (scanner *ethSwapScanner) parseSwapoutTxInput(input []byte, swapData *SwapEvent) error {
 	if len(input) < 4 {
 		return tokens.ErrTxWithWrongInput
 	}
 	funcHash := input[:4]
-	if bytes.Equal(funcHash, scanner.getSwapoutFuncHashByTxType(txType)) {
+	if bytes.Equal(funcHash, addressSwapoutFuncHash) || bytes.Equal(funcHash, stringSwapoutFuncHash) {
 		return nil
 	}
 	return tokens.ErrTxFuncHashMismatch
@@ -592,7 +658,6 @@ func (scanner *ethSwapScanner) parseSwapoutTxInput(input []byte, txType string, 
 
 func (scanner *ethSwapScanner) parseSwapoutTxLogs(logs []*types.Log, tokenCfg *params.TokenConfig, swapData *SwapEvent) (err error) {
 	targetContract := tokenCfg.TokenAddress
-	cmpLogTopic := scanner.getLogTopicByTxType(tokenCfg.TxType)
 
 	for _, rlog := range logs {
 		if rlog.Removed {
@@ -604,7 +669,38 @@ func (scanner *ethSwapScanner) parseSwapoutTxLogs(logs []*types.Log, tokenCfg *p
 		if len(rlog.Topics) != 2 || rlog.Data == nil {
 			continue
 		}
-		if rlog.Topics[0] == cmpLogTopic {
+		if rlog.Topics[0] == addressSwapoutLogTopic || rlog.Topics[0] == stringSwapoutLogTopic {
+			return nil
+		}
+	}
+	return tokens.ErrSwapoutLogNotFound
+}
+
+func (scanner *ethSwapScanner) parseMintTxInput(input []byte, swapData *SwapEvent) error {
+	if len(input) < 4 {
+		return tokens.ErrTxWithWrongInput
+	}
+	funcHash := input[:4]
+	if bytes.Equal(funcHash, swapinFuncHash) {
+		return nil
+	}
+	return tokens.ErrTxFuncHashMismatch
+}
+
+func (scanner *ethSwapScanner) parseMintTxLogs(logs []*types.Log, tokenCfg *params.TokenConfig, swapData *SwapEvent) (err error) {
+	targetContract := tokenCfg.TokenAddress
+
+	for _, rlog := range logs {
+		if rlog.Removed {
+			continue
+		}
+		if !strings.EqualFold(rlog.Address.Hex(), targetContract) {
+			continue
+		}
+		if len(rlog.Topics) != 2 || rlog.Data == nil {
+			continue
+		}
+		if rlog.Topics[0] == swapinLogTopic {
 			return nil
 		}
 	}
@@ -635,4 +731,24 @@ func (cache *cachedSacnnedBlocks) isScanned(blockHash string) bool {
 		}
 	}
 	return false
+}
+
+func (scanner *ethSwapScanner) getBlockTimestamp(blockNumber *big.Int) int64 {
+	header, err := scanner.client.HeaderByNumber(context.Background(), blockNumber)
+	if err != nil {
+		return 0
+	}
+	return int64(header.Time)
+}
+
+func GetData(data []byte, start uint64, size uint64) []byte {
+	length := uint64(len(data))
+	if start > length {
+		start = length
+	}
+	end := start + size
+	if end > length {
+		end = length
+	}
+	return common.RightPadBytes(data[start:end], int(size))
 }
